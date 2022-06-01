@@ -116,6 +116,47 @@ std::list<chess::Move> chess::Chess::list_next_moves()
 
 void chess::Chess::pawn_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
+  bool is_first_move = x == (current_turn() == WHITE ? 1 : 6);
+  Type opponent = current_turn() == WHITE ? WHITE : BLACK;
+
+  if (current_turn() == WHITE)
+  {
+    if (x + 1 < BOARD_WIDTH && board[x + 1][y].type == EMPTY)
+    {
+      moves.push_back({x, y, x + 1, y});
+      if (is_first_move && x + 2 < BOARD_WIDTH && board[x + 2][y].type == EMPTY)
+      {
+        moves.push_back({x, y, x + 2, y});
+      }
+    }
+    if (x + 1 < BOARD_WIDTH && y - 1 >= 0 && board[x + 1][y - 1].type == opponent)
+    {
+      moves.push_back({x, y, x + 1, y - 1});
+    }
+    if (x + 1 < BOARD_WIDTH && y + 1 < BOARD_WIDTH && board[x + 1][y + 1].type == opponent)
+    {
+      moves.push_back({x, y, x + 1, y + 1});
+    }
+  }
+  else
+  {
+    if (x - 1 >= 0 && board[x - 1][y].type == EMPTY)
+    {
+      moves.push_back({x, y, x - 1, y});
+      if (is_first_move && x - 2 >= 0 && board[x - 2][y].type == EMPTY)
+      {
+        moves.push_back({x, y, x - 2, y});
+      }
+    }
+    if (x - 1 >= 0 && y - 1 >= 0 && board[x - 1][y - 1].type == opponent)
+    {
+      moves.push_back({x, y, x - 1, y - 1});
+    }
+    if (x - 1 >= 0 && y + 1 < BOARD_WIDTH && board[x - 1][y + 1].type == opponent)
+    {
+      moves.push_back({x, y, x - 1, y + 1});
+    }
+  }
 }
 
 void chess::Chess::rook_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
@@ -128,15 +169,15 @@ void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x
   {
     moves.push_back({x, y, x - 2, y - 1});
   }
-  if (x - 2 >= 0 && y + 1 >= 0 && board[x - 2][y + 1].type != current_turn())
+  if (x - 2 >= 0 && y + 1 < BOARD_WIDTH && board[x - 2][y + 1].type != current_turn())
   {
     moves.push_back({x, y, x - 2, y + 1});
   }
-  if (x + 2 >= 0 && y - 1 >= 0 && board[x + 2][y - 1].type != current_turn())
+  if (x + 2 < BOARD_WIDTH && y - 1 >= 0 && board[x + 2][y - 1].type != current_turn())
   {
     moves.push_back({x, y, x + 2, y - 1});
   }
-  if (x + 2 >= 0 && y + 1 >= 0 && board[x + 2][y + 1].type != current_turn())
+  if (x + 2 < BOARD_WIDTH && y + 1 < BOARD_WIDTH && board[x + 2][y + 1].type != current_turn())
   {
     moves.push_back({x, y, x + 2, y + 1});
   }
@@ -144,15 +185,15 @@ void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x
   {
     moves.push_back({x, y, x - 1, y - 2});
   }
-  if (x + 1 >= 0 && y - 2 >= 0 && board[x + 1][y - 2].type != current_turn())
+  if (x + 1 < BOARD_WIDTH && y - 2 >= 0 && board[x + 1][y - 2].type != current_turn())
   {
     moves.push_back({x, y, x + 1, y - 2});
   }
-  if (x - 1 >= 0 && y + 2 >= 0 && board[x - 1][y + 2].type != current_turn())
+  if (x - 1 >= 0 && y + 2 < BOARD_WIDTH && board[x - 1][y + 2].type != current_turn())
   {
     moves.push_back({x, y, x - 1, y + 2});
   }
-  if (x + 1 >= 0 && y + 2 >= 0 && board[x + 1][y + 2].type != current_turn())
+  if (x + 1 < BOARD_WIDTH && y + 2 < BOARD_WIDTH && board[x + 1][y + 2].type != current_turn())
   {
     moves.push_back({x, y, x + 1, y + 2});
   }
