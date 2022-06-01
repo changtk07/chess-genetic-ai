@@ -2,15 +2,14 @@
 #define chess_hpp
 
 #pragma once
+#include <ostream>
 #include <string>
 #include <list>
 #include <vector>
+#include <unordered_map>
 
 namespace chess
 {
-
-  const int BOARD_WIDTH = 8;
-
   enum Piece
   {
     PAWN,
@@ -39,29 +38,36 @@ namespace chess
     int x2, y2;
   };
 
+  typedef std::vector<std::vector<Square>> Board;
+
   class Chess
   {
   private:
     int round;
-    std::vector<std::vector<Square>> board;
+    Board board;
 
-  public:
-    Chess();
-    Type current_turn();
-    std::list<Move> list_next_moves();
     void pawn_next_moves(std::list<Move> &, const int &, const int &);
     void rook_next_moves(std::list<Move> &, const int &, const int &);
     void knight_next_moves(std::list<Move> &, const int &, const int &);
     void bishop_next_moves(std::list<Move> &, const int &, const int &);
     void queen_next_moves(std::list<Move> &, const int &, const int &);
     void king_next_moves(std::list<Move> &, const int &, const int &);
+
+  public:
+    static const int BOARD_WIDTH = 8;
+
+    Chess();
+    Type current_turn();
+    std::list<Move> list_next_moves();
+
+    const Board &get();
   };
 
 } // namespace chess
 
 ///////////////////////////////////////////////////////////////////////////////
 
-chess::Chess::Chess() : round(1), board(chess::BOARD_WIDTH)
+chess::Chess::Chess() : round(1), board(BOARD_WIDTH)
 {
   board[0] = {{WHITE, ROOK}, {WHITE, KNIGHT}, {WHITE, BISHOP}, {WHITE, QUEEN}, {WHITE, KING}, {WHITE, BISHOP}, {WHITE, KNIGHT}, {WHITE, ROOK}};
   board[1] = {{WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}, {WHITE, PAWN}};
@@ -245,7 +251,8 @@ void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x
 
 void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
-  for (int i = x + 1, j = y + 1; i < BOARD_WIDTH && j < BOARD_WIDTH; ++i, ++j) {
+  for (int i = x + 1, j = y + 1; i < BOARD_WIDTH && j < BOARD_WIDTH; ++i, ++j)
+  {
     if (board[i][j].type != current_turn())
     {
       moves.push_back({x, y, i, j});
@@ -256,7 +263,8 @@ void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x
     }
   }
 
-  for (int i = x + 1, j = y - 1; i < BOARD_WIDTH && j >= 0; ++i, --j) {
+  for (int i = x + 1, j = y - 1; i < BOARD_WIDTH && j >= 0; ++i, --j)
+  {
     if (board[i][j].type != current_turn())
     {
       moves.push_back({x, y, i, j});
@@ -267,7 +275,8 @@ void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x
     }
   }
 
-  for (int i = x - 1, j = y + 1; i >= 0 && j < BOARD_WIDTH; --i, ++j) {
+  for (int i = x - 1, j = y + 1; i >= 0 && j < BOARD_WIDTH; --i, ++j)
+  {
     if (board[i][j].type != current_turn())
     {
       moves.push_back({x, y, i, j});
@@ -278,7 +287,8 @@ void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x
     }
   }
 
-  for (int i = x - 1, j = y - 1; i >= 0 && j >= 0; --i, --j) {
+  for (int i = x - 1, j = y - 1; i >= 0 && j >= 0; --i, --j)
+  {
     if (board[i][j].type != current_turn())
     {
       moves.push_back({x, y, i, j});
@@ -333,6 +343,39 @@ void chess::Chess::king_next_moves(std::list<chess::Move> &moves, const int &x, 
   {
     moves.push_back({x, y, x + 1, y + 1});
   }
+}
+
+const chess::Board &chess::Chess::get()
+{
+  return board;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+std::ostream &operator<<(std::ostream &os, const chess::Board &board)
+{
+  using namespace chess;
+
+  static std::unordered_map<Piece, char> abbr{
+      {PAWN, 'P'},
+      {ROOK, 'R'},
+      {KNIGHT, 'N'},
+      {BISHOP, 'B'},
+      {QUEEN, 'Q'},
+      {KING, 'K'},
+  };
+
+  os << "---------------------------------\n";
+  for (const auto &rank : board)
+  {
+    for (const Square &sqr : rank)
+    {
+      os << '|' << ' ' << (sqr.type == EMPTY ? ' ' : abbr[sqr.piece]) << ' ';
+    }
+    os << '|' << '\n';
+    os << "---------------------------------\n";
+  }
+  return os;
 }
 
 #endif // chess_hpp
