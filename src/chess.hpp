@@ -245,6 +245,49 @@ void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x
 
 void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
+  for (int i = x + 1, j = y + 1; i < BOARD_WIDTH && j < BOARD_WIDTH; ++i, ++j) {
+    if (board[i][j].type != current_turn())
+    {
+      moves.push_back({x, y, i, j});
+    }
+    if (board[i][j].type != EMPTY)
+    {
+      break;
+    }
+  }
+
+  for (int i = x + 1, j = y - 1; i < BOARD_WIDTH && j >= 0; ++i, --j) {
+    if (board[i][j].type != current_turn())
+    {
+      moves.push_back({x, y, i, j});
+    }
+    if (board[i][j].type != EMPTY)
+    {
+      break;
+    }
+  }
+
+  for (int i = x - 1, j = y + 1; i >= 0 && j < BOARD_WIDTH; --i, ++j) {
+    if (board[i][j].type != current_turn())
+    {
+      moves.push_back({x, y, i, j});
+    }
+    if (board[i][j].type != EMPTY)
+    {
+      break;
+    }
+  }
+
+  for (int i = x - 1, j = y - 1; i >= 0 && j >= 0; --i, --j) {
+    if (board[i][j].type != current_turn())
+    {
+      moves.push_back({x, y, i, j});
+    }
+    if (board[i][j].type != EMPTY)
+    {
+      break;
+    }
+  }
 }
 
 void chess::Chess::queen_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
