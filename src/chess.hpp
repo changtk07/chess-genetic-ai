@@ -124,6 +124,38 @@ void chess::Chess::rook_next_moves(std::list<chess::Move> &moves, const int &x, 
 
 void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
+  if (x - 2 >= 0 && y - 1 >= 0 && board[x - 2][y - 1].type != current_turn())
+  {
+    moves.push_back({x, y, x - 2, y - 1});
+  }
+  if (x - 2 >= 0 && y + 1 >= 0 && board[x - 2][y + 1].type != current_turn())
+  {
+    moves.push_back({x, y, x - 2, y + 1});
+  }
+  if (x + 2 >= 0 && y - 1 >= 0 && board[x + 2][y - 1].type != current_turn())
+  {
+    moves.push_back({x, y, x + 2, y - 1});
+  }
+  if (x + 2 >= 0 && y + 1 >= 0 && board[x + 2][y + 1].type != current_turn())
+  {
+    moves.push_back({x, y, x + 2, y + 1});
+  }
+  if (x - 1 >= 0 && y - 2 >= 0 && board[x - 1][y - 2].type != current_turn())
+  {
+    moves.push_back({x, y, x - 1, y - 2});
+  }
+  if (x + 1 >= 0 && y - 2 >= 0 && board[x + 1][y - 2].type != current_turn())
+  {
+    moves.push_back({x, y, x + 1, y - 2});
+  }
+  if (x - 1 >= 0 && y + 2 >= 0 && board[x - 1][y + 2].type != current_turn())
+  {
+    moves.push_back({x, y, x - 1, y + 2});
+  }
+  if (x + 1 >= 0 && y + 2 >= 0 && board[x + 1][y + 2].type != current_turn())
+  {
+    moves.push_back({x, y, x + 1, y + 2});
+  }
 }
 
 void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
