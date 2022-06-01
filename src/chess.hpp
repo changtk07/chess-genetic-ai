@@ -161,6 +161,50 @@ void chess::Chess::pawn_next_moves(std::list<chess::Move> &moves, const int &x, 
 
 void chess::Chess::rook_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
+  for (int i = x + 1; i < BOARD_WIDTH; ++i)
+  {
+    if (board[i][y].type != current_turn())
+    {
+      moves.push_back({x, y, i, y});
+    }
+    if (board[i][y].type != EMPTY)
+    {
+      break;
+    }
+  }
+  for (int i = x - 1; i >= 0; --i)
+  {
+    if (board[i][y].type != current_turn())
+    {
+      moves.push_back({x, y, i, y});
+    }
+    if (board[i][y].type != EMPTY)
+    {
+      break;
+    }
+  }
+  for (int i = y + 1; i < BOARD_WIDTH; ++i)
+  {
+    if (board[x][i].type != current_turn())
+    {
+      moves.push_back({x, y, x, i});
+    }
+    if (board[x][i].type != EMPTY)
+    {
+      break;
+    }
+  }
+  for (int i = y - 1; i >= 0; --i)
+  {
+    if (board[x][i].type != current_turn())
+    {
+      moves.push_back({x, y, x, i});
+    }
+    if (board[x][i].type != EMPTY)
+    {
+      break;
+    }
+  }
 }
 
 void chess::Chess::knight_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
