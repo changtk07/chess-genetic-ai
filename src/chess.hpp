@@ -292,6 +292,8 @@ void chess::Chess::bishop_next_moves(std::list<chess::Move> &moves, const int &x
 
 void chess::Chess::queen_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
 {
+  rook_next_moves(moves, x, y);
+  bishop_next_moves(moves, x, y);
 }
 
 void chess::Chess::king_next_moves(std::list<chess::Move> &moves, const int &x, const int &y)
