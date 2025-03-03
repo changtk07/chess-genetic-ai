@@ -1,3 +1,7 @@
-mod chess;
+use chess::Game;
 
-fn main() {}
+mod chess;
+fn main() {
+    let game = Game::new();
+    println!("{}", game);
+}

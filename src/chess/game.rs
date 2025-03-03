@@ -1,15 +1,17 @@
 use super::board::{Board, Position};
 use super::piece::{Color, Piece, Type};
-use super::r#move::{CastlingRights, ChessMove, NormalMove};
+use super::r#move::{
+    CastleMove, CastlingRights, DoubleAdvanceMove, EnPassantMove, Move, NormalMove, PromotionMove,
+};
 
 #[derive(Clone)]
 pub struct Game {
-    pub board: Board,
-    pub turn: Color,
-    pub en_passant: Option<Position>,
-    pub castling_rights: CastlingRights,
-    pub full_moves: usize,
-    pub half_moves: usize,
+    board: Board,
+    turn: Color,
+    en_passant: Option<Position>,
+    castling_rights: CastlingRights,
+    full_moves: usize,
+    half_moves: usize,
 }
 
 impl std::fmt::Display for Game {
@@ -39,7 +41,7 @@ impl Game {
         }
     }
 
-    pub fn make_move(&mut self, mv: &ChessMove) {
+    pub fn make_move(&mut self, mv: &Move) {
         if self.turn == Color::Black {
             self.full_moves += 1;
         }
@@ -50,21 +52,21 @@ impl Game {
         self.update_castling_rights(mv);
     }
 
-    pub fn make_move_copy(&self, mv: &ChessMove) -> Game {
+    pub fn make_move_copy(&self, mv: &Move) -> Game {
         let mut new_game = self.clone();
         new_game.make_move(mv);
         new_game
     }
 
-    fn update_en_passant(&mut self, mv: &ChessMove) {
+    fn update_en_passant(&mut self, mv: &Move) {
         self.en_passant = match mv {
-            ChessMove::EnPassant(en_passant) => Some(en_passant.position),
+            Move::DoubleAdvance(mv) => Some(Position((mv.from.0 + mv.to.0) / 2, mv.from.1)),
             _ => None,
         }
     }
 
-    fn update_castling_rights(&mut self, mv: &ChessMove) {
-        let ChessMove::Normal(normal) = mv else {
+    fn update_castling_rights(&mut self, mv: &Move) {
+        let Move::Normal(normal) = mv else {
             return;
         };
 
@@ -97,9 +99,16 @@ impl Game {
         }
     }
 
-    pub fn validate_move(&self, mv: &ChessMove) -> bool {
+    pub fn validate_move(&self, mv: &Move) -> bool {
         match mv {
-            ChessMove::Normal(normal) => self.validate_normal_move(normal),
+            Move::Normal(normal) => self.validate_normal_move(normal),
+            Move::DoubleAdvance(double_advance) => {
+                self.validate_double_advance_move(double_advance)
+            }
+            Move::EnPassant(en_passant) => self.validate_en_passant_move(en_passant),
+            // TODO:
+            // Move::Promotion(promotion) => self.validate_promotion_move(promotion),
+            // Move::Castle(castle) => self.validate_castle_move(castle),
             _ => false,
         }
     }
@@ -125,72 +134,26 @@ impl Game {
     }
 
     fn validate_pawn_normal_move(&self, mv: &NormalMove) -> bool {
-        match self.turn {
-            Color::White => self.validate_white_pawn_normal_move(mv),
-            Color::Black => self.validate_black_pawn_normal_move(mv),
-        }
-    }
-
-    fn validate_white_pawn_normal_move(&self, mv: &NormalMove) -> bool {
         if mv.from.0 == 0 || mv.from.0 == 7 {
             return false;
         }
 
-        let forward_one = Position(mv.from.0 + 1, mv.from.1);
-        let forward_two = Position(mv.from.0 + 2, mv.from.1);
-        let capture_left = Position(mv.from.0 + 1, mv.from.1 - 1);
-        let capture_right = Position(mv.from.0 + 1, mv.from.1 + 1);
+        let (forward_one, capture_left, capture_right) = match self.turn {
+            Color::White => (
+                Position(mv.from.0 + 1, mv.from.1),
+                Position(mv.from.0 + 1, mv.from.1 - 1),
+                Position(mv.from.0 + 1, mv.from.1 + 1),
+            ),
+            Color::Black => (
+                Position(mv.from.0 - 1, mv.from.1),
+                Position(mv.from.0 - 1, mv.from.1 - 1),
+                Position(mv.from.0 - 1, mv.from.1 + 1),
+            ),
+        };
 
-        if mv.from.0 == 1
-            && mv.to == forward_two
-            && self.board.is_position_empty(forward_one)
-            && self.board.is_position_empty(mv.to)
-        {
-            return true;
-        }
-
-        if mv.to == forward_one && self.board.is_position_empty(mv.to) {
-            return true;
-        }
-
-        if (mv.to == capture_left || mv.to == capture_right)
-            && self.board.is_position_color(mv.to, Color::Black)
-        {
-            return true;
-        }
-
-        false
-    }
-
-    fn validate_black_pawn_normal_move(&self, mv: &NormalMove) -> bool {
-        if mv.from.0 == 0 || mv.from.0 == 7 {
-            return false;
-        }
-
-        let forward_one = Position(mv.from.0 - 1, mv.from.1);
-        let forward_two = Position(mv.from.0 - 2, mv.from.1);
-        let capture_left = Position(mv.from.0 - 1, mv.from.1 - 1);
-        let capture_right = Position(mv.from.0 - 1, mv.from.1 + 1);
-
-        if mv.from.0 == 6
-            && mv.to == forward_two
-            && self.board.is_position_empty(forward_one)
-            && self.board.is_position_empty(mv.to)
-        {
-            return true;
-        }
-
-        if mv.to == forward_one && self.board.is_position_empty(mv.to) {
-            return true;
-        }
-
-        if (mv.to == capture_left || mv.to == capture_right)
-            && self.board.is_position_color(mv.to, Color::White)
-        {
-            return true;
-        }
-
-        false
+        (mv.to == forward_one && self.board.is_position_empty(mv.to))
+            || ((mv.to == capture_left || mv.to == capture_right)
+                && self.board.is_position_color(mv.to, self.turn.opposite()))
     }
 
     fn validate_rook_normal_move(&self, mv: &NormalMove) -> bool {
@@ -221,10 +184,10 @@ impl Game {
     }
 
     fn validate_knight_normal_move(&self, mv: &NormalMove) -> bool {
-        let diff_rank = mv.from.0.abs_diff(mv.to.0);
-        let diff_file = mv.from.1.abs_diff(mv.to.1);
+        let rank_diff = mv.from.0.abs_diff(mv.to.0);
+        let file_diff = mv.from.1.abs_diff(mv.to.1);
 
-        ((diff_file == 1 && diff_rank == 2) || (diff_file == 2 && diff_rank == 1))
+        ((file_diff == 1 && rank_diff == 2) || (file_diff == 2 && rank_diff == 1))
             && self
                 .board
                 .is_position_empty_or_color(mv.to, self.turn.opposite())
@@ -270,4 +233,70 @@ impl Game {
                 .board
                 .is_position_empty_or_color(mv.to, self.turn.opposite())
     }
+
+    fn validate_double_advance_move(&self, mv: &DoubleAdvanceMove) -> bool {
+        if !mv.from.is_valid() || !mv.to.is_valid() {
+            return false;
+        }
+
+        if !self
+            .board
+            .is_position_piece(mv.from, Piece(self.turn, Type::Pawn))
+        {
+            return false;
+        }
+
+        let (start_rank, forward_one, forward_two) = match self.turn {
+            Color::White => (
+                1,
+                Position(mv.from.0 + 1, mv.from.1),
+                Position(mv.from.0 + 2, mv.from.1),
+            ),
+            Color::Black => (
+                6,
+                Position(mv.from.0 - 1, mv.from.1),
+                Position(mv.from.0 - 2, mv.from.1),
+            ),
+        };
+
+        mv.from.0 == start_rank
+            && mv.to == forward_two
+            && self.board.is_position_empty(forward_one)
+            && self.board.is_position_empty(mv.to)
+    }
+
+    fn validate_en_passant_move(&self, mv: &EnPassantMove) -> bool {
+        if !mv.from.is_valid() || !mv.to.is_valid() || mv.from == mv.to {
+            return false;
+        }
+
+        // Check mv.from on board is pawn of current turn
+        match self.board.get_piece(mv.from) {
+            Some(piece) if piece == Piece(self.turn, Type::Pawn) => (),
+            _ => return false,
+        }
+
+        // Check mv.to is en passant position
+        let en_passant = match self.en_passant {
+            Some(position) if mv.to == position => position,
+            _ => return false,
+        };
+
+        // Check mv.from file is valid
+        if mv.from.1 != en_passant.0 + 1 && mv.from.1 != en_passant.0 - 1 {
+            return false;
+        }
+
+        // Check mv.from rank is valid
+        match self.turn {
+            Color::White => mv.from.0 == en_passant.0 - 1,
+            Color::Black => mv.from.0 == en_passant.0 + 1,
+        }
+    }
+
+    // TODO:
+    // fn validate_promotion_move(&self, mv: &PromotionMove) -> bool {}
+
+    // TODO:
+    // fn validate_castle_move(&self, mv: &CastleMove) -> bool {}
 }

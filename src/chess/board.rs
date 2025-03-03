@@ -1,5 +1,7 @@
 use super::piece::{Color, Piece, Type};
-use super::r#move::{CastleMove, ChessMove, EnPassantMove, NormalMove, PromotionMove};
+use super::r#move::{
+    CastleMove, DoubleAdvanceMove, EnPassantMove, Move, NormalMove, PromotionMove,
+};
 
 #[derive(Copy, Clone, PartialEq)]
 pub struct Position(pub u8, pub u8);
@@ -7,6 +9,12 @@ pub struct Position(pub u8, pub u8);
 impl Position {
     pub fn is_valid(&self) -> bool {
         self.0 < 8 && self.1 < 8
+    }
+}
+
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", (self.0 + b'a') as char, self.1 + 1)
     }
 }
 
@@ -78,6 +86,10 @@ impl Board {
         self.get_piece(position).is_none()
     }
 
+    pub fn is_position_piece(&self, position: Position, piece: Piece) -> bool {
+        self.get_piece(position).map_or(false, |got| got == piece)
+    }
+
     pub fn is_position_color(&self, position: Position, color: Color) -> bool {
         self.get_piece(position)
             .map_or(false, |piece| piece.0 == color)
@@ -87,16 +99,17 @@ impl Board {
         self.is_position_empty(position) || self.is_position_color(position, color)
     }
 
-    pub fn apply_move(&mut self, mv: &ChessMove) {
+    pub fn apply_move(&mut self, mv: &Move) {
         match mv {
-            ChessMove::Normal(mv) => self.apply_normal_move(mv),
-            ChessMove::EnPassant(mv) => self.apply_en_passant_move(mv),
-            ChessMove::Promotion(mv) => self.apply_promotion_move(mv),
-            ChessMove::Castle(mv) => self.apply_castle_move(mv),
+            Move::Normal(mv) => self.apply_normal_move(mv),
+            Move::DoubleAdvance(mv) => self.apply_double_advance_move(mv),
+            Move::EnPassant(mv) => self.apply_en_passant_move(mv),
+            Move::Promotion(mv) => self.apply_promotion_move(mv),
+            Move::Castle(mv) => self.apply_castle_move(mv),
         }
     }
 
-    pub fn apply_move_copy(&self, mv: &ChessMove) -> Board {
+    pub fn apply_move_copy(&self, mv: &Move) -> Board {
         let mut new_board = self.clone();
         new_board.apply_move(mv);
         new_board
@@ -107,9 +120,15 @@ impl Board {
         self.set_piece(mv.from, None);
     }
 
+    fn apply_double_advance_move(&mut self, mv: &DoubleAdvanceMove) {
+        self.set_piece(mv.to, self.get_piece(mv.from));
+        self.set_piece(mv.from, None);
+    }
+
     fn apply_en_passant_move(&mut self, en_passant: &EnPassantMove) {
-        self.apply_normal_move(&en_passant.pawn);
-        self.set_piece(en_passant.position, None);
+        self.set_piece(en_passant.to, self.get_piece(en_passant.from));
+        self.set_piece(en_passant.from, None);
+        self.set_piece(Position(en_passant.from.0, en_passant.to.1), None);
     }
 
     fn apply_promotion_move(&mut self, promotion: &PromotionMove) {

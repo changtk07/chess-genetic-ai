@@ -1,4 +1,4 @@
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Type {
     Pawn,
     Rook,
@@ -34,7 +34,7 @@ impl Color {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Piece(pub Color, pub Type);
 
 impl std::fmt::Display for Piece {

@@ -9,8 +9,9 @@ pub struct CastlingRights {
     pub black_queen: bool,
 }
 
-pub enum ChessMove {
+pub enum Move {
     Normal(NormalMove),
+    DoubleAdvance(DoubleAdvanceMove),
     EnPassant(EnPassantMove),
     Promotion(PromotionMove),
     Castle(CastleMove),
@@ -21,9 +22,14 @@ pub struct NormalMove {
     pub to: Position,
 }
 
+pub struct DoubleAdvanceMove {
+    pub from: Position,
+    pub to: Position,
+}
+
 pub struct EnPassantMove {
-    pub pawn: NormalMove,
-    pub position: Position,
+    pub from: Position,
+    pub to: Position,
 }
 
 pub struct PromotionMove {
