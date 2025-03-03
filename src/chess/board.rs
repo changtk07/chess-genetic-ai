@@ -132,7 +132,7 @@ impl Board {
     }
 
     fn apply_promotion_move(&mut self, promotion: &PromotionMove) {
-        self.set_piece(promotion.pawn.from, Some(promotion.to));
+        self.set_piece(promotion.pawn.from, Some(promotion.promotion));
         self.apply_normal_move(&promotion.pawn);
     }
 

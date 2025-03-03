@@ -34,7 +34,7 @@ pub struct EnPassantMove {
 
 pub struct PromotionMove {
     pub pawn: NormalMove,
-    pub to: Piece,
+    pub promotion: Piece,
 }
 
 pub struct CastleMove {

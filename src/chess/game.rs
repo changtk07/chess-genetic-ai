@@ -106,8 +106,8 @@ impl Game {
                 self.validate_double_advance_move(double_advance)
             }
             Move::EnPassant(en_passant) => self.validate_en_passant_move(en_passant),
+            Move::Promotion(promotion) => self.validate_promotion_move(promotion),
             // TODO:
-            // Move::Promotion(promotion) => self.validate_promotion_move(promotion),
             // Move::Castle(castle) => self.validate_castle_move(castle),
             _ => false,
         }
@@ -235,13 +235,11 @@ impl Game {
     }
 
     fn validate_double_advance_move(&self, mv: &DoubleAdvanceMove) -> bool {
-        if !mv.from.is_valid() || !mv.to.is_valid() {
-            return false;
-        }
-
-        if !self
-            .board
-            .is_position_piece(mv.from, Piece(self.turn, Type::Pawn))
+        if !mv.from.is_valid()
+            || !mv.to.is_valid()
+            || !self
+                .board
+                .is_position_piece(mv.from, Piece(self.turn, Type::Pawn))
         {
             return false;
         }
@@ -294,8 +292,20 @@ impl Game {
         }
     }
 
-    // TODO:
-    // fn validate_promotion_move(&self, mv: &PromotionMove) -> bool {}
+    fn validate_promotion_move(&self, mv: &PromotionMove) -> bool {
+        mv.pawn.from.is_valid()
+            && mv.pawn.to.is_valid()
+            && mv.pawn.from != mv.pawn.to
+            && mv.promotion.color() == self.turn
+            && matches!(
+                mv.promotion.kind(),
+                Type::Rook | Type::Knight | Type::Bishop | Type::Queen
+            )
+            && self
+                .board
+                .is_position_piece(mv.pawn.from, Piece(self.turn, Type::Pawn))
+            && self.validate_pawn_normal_move(&mv.pawn)
+    }
 
     // TODO:
     // fn validate_castle_move(&self, mv: &CastleMove) -> bool {}
