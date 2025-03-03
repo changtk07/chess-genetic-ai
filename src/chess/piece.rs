@@ -8,7 +8,7 @@ pub enum Type {
     King,
 }
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Color {
     White,
     Black,

@@ -30,12 +30,7 @@ impl Game {
             board: Board::new(),
             turn: Color::White,
             en_passant: None,
-            castling_rights: CastlingRights {
-                white_king: true,
-                white_queen: true,
-                black_king: true,
-                black_queen: true,
-            },
+            castling_rights: CastlingRights::new(),
             half_moves: 0,
             full_moves: 0,
         }
@@ -66,36 +61,17 @@ impl Game {
     }
 
     fn update_castling_rights(&mut self, mv: &Move) {
-        let Move::Normal(normal) = mv else {
-            return;
-        };
-
-        let Some(Piece(color, kind)) = self.board.get_piece(normal.from) else {
-            return;
-        };
-
-        match (color, kind, normal.from) {
-            (Color::White, Type::King, _) => {
-                self.castling_rights.white_king = false;
-                self.castling_rights.white_queen = false;
+        if let Move::Normal(normal) = mv {
+            match self.board.get_piece(normal.from) {
+                Some(Piece(color, Type::King)) => self.castling_rights.disable_both_sides(color),
+                Some(Piece(color, Type::Rook)) if normal.from.1 == 0 => {
+                    self.castling_rights.disable_queen_side(color)
+                }
+                Some(Piece(color, Type::Rook)) if normal.from.1 == 7 => {
+                    self.castling_rights.disable_king_side(color)
+                }
+                _ => (),
             }
-            (Color::Black, Type::King, _) => {
-                self.castling_rights.black_king = false;
-                self.castling_rights.black_queen = false;
-            }
-            (Color::White, Type::Rook, Position(0, 0)) => {
-                self.castling_rights.white_queen = false;
-            }
-            (Color::White, Type::Rook, Position(0, 7)) => {
-                self.castling_rights.white_king = false;
-            }
-            (Color::Black, Type::Rook, Position(7, 0)) => {
-                self.castling_rights.black_queen = false;
-            }
-            (Color::Black, Type::Rook, Position(7, 7)) => {
-                self.castling_rights.black_king = false;
-            }
-            _ => (),
         }
     }
 
