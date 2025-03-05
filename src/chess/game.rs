@@ -62,7 +62,7 @@ impl Game {
 
     fn update_castling_rights(&mut self, mv: &Move) {
         if let Move::Normal(normal) = mv {
-            match self.board.get_piece(normal.from) {
+            match self.board.get_piece(&normal.from) {
                 Some(Piece(color, Type::King)) => self.castling_rights.disable_both_sides(color),
                 Some(Piece(color, Type::Rook)) if normal.from.1 == 0 => {
                     self.castling_rights.disable_queen_side(color)
@@ -94,8 +94,8 @@ impl Game {
             return false;
         }
 
-        let piece = match self.board.get_piece(mv.from) {
-            Some(piece) if piece.color() == self.turn => piece,
+        let piece = match self.board.get_piece(&mv.from) {
+            Some(piece) if *piece.color() == self.turn => piece,
             _ => return false,
         };
 
@@ -127,9 +127,9 @@ impl Game {
             ),
         };
 
-        (mv.to == forward_one && self.board.is_position_empty(mv.to))
+        (mv.to == forward_one && self.board.is_position_empty(&mv.to))
             || ((mv.to == capture_left || mv.to == capture_right)
-                && self.board.is_position_color(mv.to, self.turn.opposite()))
+                && self.board.is_position_color(&mv.to, &self.turn.opposite()))
     }
 
     fn validate_rook_normal_move(&self, mv: &NormalMove) -> bool {
@@ -144,19 +144,19 @@ impl Game {
         };
 
         for i in (start + 1)..end {
-            let pos = if is_rank {
+            let position = if is_rank {
                 Position(i, mv.from.1)
             } else {
                 Position(mv.from.0, i)
             };
 
-            if !self.board.is_position_empty(pos) {
+            if !self.board.is_position_empty(&position) {
                 return false;
             }
         }
 
         self.board
-            .is_position_empty_or_color(mv.to, self.turn.opposite())
+            .is_position_empty_or_color(&mv.to, &self.turn.opposite())
     }
 
     fn validate_knight_normal_move(&self, mv: &NormalMove) -> bool {
@@ -166,7 +166,7 @@ impl Game {
         ((file_diff == 1 && rank_diff == 2) || (file_diff == 2 && rank_diff == 1))
             && self
                 .board
-                .is_position_empty_or_color(mv.to, self.turn.opposite())
+                .is_position_empty_or_color(&mv.to, &self.turn.opposite())
     }
 
     fn validate_bishop_normal_move(&self, mv: &NormalMove) -> bool {
@@ -186,7 +186,7 @@ impl Game {
         while rank != mv.to.0 as i8 && file != mv.to.1 as i8 {
             if !self
                 .board
-                .is_position_empty(Position(rank as u8, file as u8))
+                .is_position_empty(&Position(rank as u8, file as u8))
             {
                 return false;
             }
@@ -195,7 +195,7 @@ impl Game {
         }
 
         self.board
-            .is_position_empty_or_color(mv.to, self.turn.opposite())
+            .is_position_empty_or_color(&mv.to, &self.turn.opposite())
     }
 
     fn validate_queen_normal_move(&self, mv: &NormalMove) -> bool {
@@ -207,7 +207,7 @@ impl Game {
             && mv.from.1.abs_diff(mv.to.1) <= 1
             && self
                 .board
-                .is_position_empty_or_color(mv.to, self.turn.opposite())
+                .is_position_empty_or_color(&mv.to, &self.turn.opposite())
     }
 
     fn validate_double_advance_move(&self, mv: &DoubleAdvanceMove) -> bool {
@@ -215,7 +215,7 @@ impl Game {
             || !mv.to.is_valid()
             || !self
                 .board
-                .is_position_piece(mv.from, Piece(self.turn, Type::Pawn))
+                .is_position_piece(&mv.from, &Piece(self.turn.clone(), Type::Pawn))
         {
             return false;
         }
@@ -235,8 +235,8 @@ impl Game {
 
         mv.from.0 == start_rank
             && mv.to == forward_two
-            && self.board.is_position_empty(forward_one)
-            && self.board.is_position_empty(mv.to)
+            && self.board.is_position_empty(&forward_one)
+            && self.board.is_position_empty(&mv.to)
     }
 
     fn validate_en_passant_move(&self, mv: &EnPassantMove) -> bool {
@@ -245,14 +245,14 @@ impl Game {
         }
 
         // Check mv.from on board is pawn of current turn
-        match self.board.get_piece(mv.from) {
-            Some(piece) if piece == Piece(self.turn, Type::Pawn) => (),
+        match self.board.get_piece(&mv.from) {
+            Some(piece) if *piece == Piece(self.turn.clone(), Type::Pawn) => (),
             _ => return false,
         }
 
         // Check mv.to is en passant position
-        let en_passant = match self.en_passant {
-            Some(position) if mv.to == position => position,
+        let en_passant = match &self.en_passant {
+            Some(position) if mv.to == *position => position,
             _ => return false,
         };
 
@@ -272,14 +272,14 @@ impl Game {
         mv.pawn.from.is_valid()
             && mv.pawn.to.is_valid()
             && mv.pawn.from != mv.pawn.to
-            && mv.promotion.color() == self.turn
+            && *mv.promotion.color() == self.turn
             && matches!(
                 mv.promotion.kind(),
                 Type::Rook | Type::Knight | Type::Bishop | Type::Queen
             )
             && self
                 .board
-                .is_position_piece(mv.pawn.from, Piece(self.turn, Type::Pawn))
+                .is_position_piece(&mv.pawn.from, &Piece(self.turn.clone(), Type::Pawn))
             && self.validate_pawn_normal_move(&mv.pawn)
     }
 

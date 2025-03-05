@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Type {
     Pawn,
     Rook,
@@ -8,7 +8,7 @@ pub enum Type {
     King,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Color {
     White,
     Black,
@@ -34,7 +34,7 @@ impl Color {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Piece(pub Color, pub Type);
 
 impl std::fmt::Display for Piece {
@@ -59,11 +59,11 @@ impl std::fmt::Display for Piece {
 }
 
 impl Piece {
-    pub fn color(&self) -> Color {
-        self.0
+    pub fn color(&self) -> &Color {
+        &self.0
     }
 
-    pub fn kind(&self) -> Type {
-        self.1
+    pub fn kind(&self) -> &Type {
+        &self.1
     }
 }

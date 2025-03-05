@@ -3,7 +3,7 @@ use super::r#move::{
     CastleMove, DoubleAdvanceMove, EnPassantMove, Move, NormalMove, PromotionMove,
 };
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Position(pub u8, pub u8);
 
 impl Position {
@@ -52,12 +52,30 @@ impl Board {
                 Some(Piece(Color::White, Type::Knight)),
                 Some(Piece(Color::White, Type::Rook)),
             ],
-            [Some(Piece(Color::White, Type::Pawn)); 8],
-            [None; 8],
-            [None; 8],
-            [None; 8],
-            [None; 8],
-            [Some(Piece(Color::Black, Type::Pawn)); 8],
+            [
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, Type::Pawn)),
+            ],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, Type::Pawn)),
+            ],
             [
                 Some(Piece(Color::Black, Type::Rook)),
                 Some(Piece(Color::Black, Type::Knight)),
@@ -72,30 +90,40 @@ impl Board {
         Board(INITIAL_BOARD)
     }
 
-    pub fn get_piece(&self, position: Position) -> Option<Piece> {
-        let Position(x, y) = position;
-        self.0[x as usize][y as usize]
+    pub fn get_piece(&self, &Position(x, y): &Position) -> &Option<Piece> {
+        self.0
+            .get(x as usize)
+            .and_then(|row| row.get(y as usize))
+            .unwrap_or(&None)
     }
 
-    fn set_piece(&mut self, position: Position, piece: Option<Piece>) {
-        let Position(x, y) = position;
-        self.0[x as usize][y as usize] = piece;
+    fn set_piece(&mut self, &Position(x, y): &Position, piece: Option<Piece>) {
+        if let Some(cell) = self
+            .0
+            .get_mut(x as usize)
+            .and_then(|row| row.get_mut(y as usize))
+        {
+            *cell = piece;
+        }
     }
 
-    pub fn is_position_empty(&self, position: Position) -> bool {
+    pub fn is_position_empty(&self, position: &Position) -> bool {
         self.get_piece(position).is_none()
     }
 
-    pub fn is_position_piece(&self, position: Position, piece: Piece) -> bool {
-        self.get_piece(position).map_or(false, |got| got == piece)
-    }
-
-    pub fn is_position_color(&self, position: Position, color: Color) -> bool {
+    pub fn is_position_piece(&self, position: &Position, piece: &Piece) -> bool {
         self.get_piece(position)
-            .map_or(false, |piece| piece.0 == color)
+            .as_ref()
+            .map_or(false, |got| got == piece)
     }
 
-    pub fn is_position_empty_or_color(&self, position: Position, color: Color) -> bool {
+    pub fn is_position_color(&self, position: &Position, color: &Color) -> bool {
+        self.get_piece(position)
+            .as_ref()
+            .map_or(false, |piece| piece.0 == *color)
+    }
+
+    pub fn is_position_empty_or_color(&self, position: &Position, color: &Color) -> bool {
         self.is_position_empty(position) || self.is_position_color(position, color)
     }
 
@@ -116,28 +144,28 @@ impl Board {
     }
 
     fn apply_normal_move(&mut self, mv: &NormalMove) {
-        self.set_piece(mv.to, self.get_piece(mv.from));
-        self.set_piece(mv.from, None);
+        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
+        self.set_piece(&mv.from, None);
     }
 
     fn apply_double_advance_move(&mut self, mv: &DoubleAdvanceMove) {
-        self.set_piece(mv.to, self.get_piece(mv.from));
-        self.set_piece(mv.from, None);
+        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
+        self.set_piece(&mv.from, None);
     }
 
-    fn apply_en_passant_move(&mut self, en_passant: &EnPassantMove) {
-        self.set_piece(en_passant.to, self.get_piece(en_passant.from));
-        self.set_piece(en_passant.from, None);
-        self.set_piece(Position(en_passant.from.0, en_passant.to.1), None);
+    fn apply_en_passant_move(&mut self, mv: &EnPassantMove) {
+        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
+        self.set_piece(&mv.from, None);
+        self.set_piece(&Position(mv.from.0, mv.to.1), None);
     }
 
-    fn apply_promotion_move(&mut self, promotion: &PromotionMove) {
-        self.set_piece(promotion.pawn.from, Some(promotion.promotion));
-        self.apply_normal_move(&promotion.pawn);
+    fn apply_promotion_move(&mut self, mv: &PromotionMove) {
+        self.set_piece(&mv.pawn.from, Some(mv.promotion.clone()));
+        self.apply_normal_move(&mv.pawn);
     }
 
-    fn apply_castle_move(&mut self, castle: &CastleMove) {
-        self.apply_normal_move(&castle.king);
-        self.apply_normal_move(&castle.rook);
+    fn apply_castle_move(&mut self, mv: &CastleMove) {
+        self.apply_normal_move(&mv.king);
+        self.apply_normal_move(&mv.rook);
     }
 }

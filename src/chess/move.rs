@@ -19,21 +19,21 @@ impl CastlingRights {
         }
     }
 
-    pub fn disable_king_side(&mut self, color: Color) {
+    pub fn disable_king_side(&mut self, color: &Color) {
         match color {
             Color::White => self.white_king = false,
             Color::Black => self.black_king = false,
         }
     }
 
-    pub fn disable_queen_side(&mut self, color: Color) {
+    pub fn disable_queen_side(&mut self, color: &Color) {
         match color {
             Color::White => self.white_queen = false,
             Color::Black => self.black_queen = false,
         }
     }
 
-    pub fn disable_both_sides(&mut self, color: Color) {
+    pub fn disable_both_sides(&mut self, color: &Color) {
         match color {
             Color::White => {
                 self.white_king = false;
