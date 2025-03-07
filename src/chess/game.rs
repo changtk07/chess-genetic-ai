@@ -170,8 +170,8 @@ impl Game {
     }
 
     fn validate_bishop_normal_move(&self, mv: &NormalMove) -> bool {
-        let diff_rank = (mv.from.0 as i8 - mv.to.0 as i8).abs();
-        let diff_file = (mv.from.1 as i8 - mv.to.1 as i8).abs();
+        let diff_rank = (mv.from.0 - mv.to.0).abs();
+        let diff_file = (mv.from.1 - mv.to.1).abs();
 
         if diff_rank != diff_file {
             return false;
@@ -180,14 +180,11 @@ impl Game {
         let rank_step = if mv.from.0 < mv.to.0 { 1 } else { -1 };
         let file_step = if mv.from.1 < mv.to.1 { 1 } else { -1 };
 
-        let mut rank = mv.from.0 as i8 + rank_step;
-        let mut file = mv.from.1 as i8 + file_step;
+        let mut rank = mv.from.0 + rank_step;
+        let mut file = mv.from.1 + file_step;
 
-        while rank != mv.to.0 as i8 && file != mv.to.1 as i8 {
-            if !self
-                .board
-                .is_position_empty(&Position(rank as u8, file as u8))
-            {
+        while rank != mv.to.0 && file != mv.to.1 {
+            if !self.board.is_position_empty(&Position(rank, file)) {
                 return false;
             }
             rank += rank_step;

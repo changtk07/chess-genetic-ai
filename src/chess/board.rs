@@ -4,17 +4,17 @@ use super::r#move::{
 };
 
 #[derive(Clone, PartialEq)]
-pub struct Position(pub u8, pub u8);
+pub struct Position(pub i8, pub i8);
 
 impl Position {
     pub fn is_valid(&self) -> bool {
-        self.0 < 8 && self.1 < 8
+        (0..8).contains(&self.0) && (0..8).contains(&self.1)
     }
 }
 
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.0 + b'a') as char, self.1 + 1)
+        write!(f, "{}{}", (self.0 as u8 + b'a') as char, self.1 + 1)
     }
 }
 
@@ -125,6 +125,121 @@ impl Board {
 
     pub fn is_position_empty_or_color(&self, position: &Position, color: &Color) -> bool {
         self.is_position_empty(position) || self.is_position_color(position, color)
+    }
+
+    pub fn is_position_checked(&self, position: &Position, opponent: &Color) -> bool {
+        position.is_valid()
+            && (self.is_position_attacked_by_pawn(position, opponent)
+                || self.is_position_attacked_by_rook_or_queen(position, opponent)
+                || self.is_position_attacked_by_knight(position, opponent)
+                || self.is_position_attacked_by_bishop_or_queen(position, opponent)
+                || self.is_position_attacked_by_king(position, opponent))
+    }
+
+    fn is_position_attacked_by_pawn(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+        let rank = match opponent {
+            Color::White => x - 1,
+            Color::Black => x + 1,
+        };
+
+        let positions = [Position(rank, y - 1), Position(rank, y + 1)];
+
+        positions.iter().any(|pos| {
+            matches!(
+                self.get_piece(pos),
+                Some(Piece(color, Type::Pawn)) if *color == *opponent,
+            )
+        })
+    }
+
+    fn is_position_attacked_by_rook_or_queen(
+        &self,
+        &Position(x, y): &Position,
+        opponent: &Color,
+    ) -> bool {
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            for i in 1..8 {
+                let pos = Position(x + i * dx, y + i * dy);
+                if !pos.is_valid() {
+                    break;
+                }
+
+                match self.get_piece(&pos) {
+                    None => continue,
+                    Some(Piece(color, Type::Rook | Type::Queen)) if color == opponent => {
+                        return true
+                    }
+                    _ => break,
+                };
+            }
+        }
+
+        false
+    }
+
+    fn is_position_attacked_by_knight(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+        let positions = [
+            Position(x + 1, y - 2),
+            Position(x + 2, y - 1),
+            Position(x + 2, y + 1),
+            Position(x + 1, y + 2),
+            Position(x - 1, y + 2),
+            Position(x - 2, y + 1),
+            Position(x - 2, y - 1),
+            Position(x - 1, y - 2),
+        ];
+
+        positions.iter().any(|pos| {
+            matches!(
+                self.get_piece(pos),
+                Some(Piece(color, Type::Knight)) if *color == *opponent,
+            )
+        })
+    }
+
+    fn is_position_attacked_by_bishop_or_queen(
+        &self,
+        &Position(x, y): &Position,
+        opponent: &Color,
+    ) -> bool {
+        for (dx, dy) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
+            for i in 1..8 {
+                let pos = Position(x + i * dx, y + i * dy);
+                if !pos.is_valid() {
+                    break;
+                }
+
+                match self.get_piece(&pos) {
+                    None => continue,
+                    Some(Piece(color, Type::Bishop | Type::Queen)) if color == opponent => {
+                        return true
+                    }
+                    _ => break,
+                };
+            }
+        }
+
+        false
+    }
+
+    fn is_position_attacked_by_king(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+        let positions = [
+            Position(x - 1, y - 1),
+            Position(x - 1, y),
+            Position(x - 1, y + 1),
+            Position(x + 1, y - 1),
+            Position(x + 1, y),
+            Position(x + 1, y + 1),
+            Position(x, y - 1),
+            Position(x, y + 1),
+        ];
+
+        positions.iter().any(|pos| {
+            matches!(
+                self.get_piece(pos),
+                Some(Piece(color, Type::King)) if *color == *opponent,
+            )
+        })
     }
 
     pub fn apply_move(&mut self, mv: &Move) {
