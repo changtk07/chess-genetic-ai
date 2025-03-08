@@ -3,10 +3,10 @@ use super::piece::{Color, Piece};
 
 #[derive(Clone)]
 pub struct CastlingRights {
-    white_king: bool,
-    white_queen: bool,
-    black_king: bool,
-    black_queen: bool,
+    pub white_king: bool,
+    pub white_queen: bool,
+    pub black_king: bool,
+    pub black_queen: bool,
 }
 
 impl CastlingRights {
@@ -15,7 +15,7 @@ impl CastlingRights {
             white_king: true,
             white_queen: true,
             black_king: true,
-            black_queen: false,
+            black_queen: true,
         }
     }
 
@@ -75,7 +75,9 @@ pub struct PromotionMove {
     pub promotion: Piece,
 }
 
-pub struct CastleMove {
-    pub king: NormalMove,
-    pub rook: NormalMove,
+pub enum CastleMove {
+    WhiteKingSide,
+    WhiteQueenSide,
+    BlackKingSide,
+    BlackQueenSide,
 }

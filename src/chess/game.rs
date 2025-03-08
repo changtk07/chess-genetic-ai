@@ -83,9 +83,7 @@ impl Game {
             }
             Move::EnPassant(en_passant) => self.validate_en_passant_move(en_passant),
             Move::Promotion(promotion) => self.validate_promotion_move(promotion),
-            // TODO:
-            // Move::Castle(castle) => self.validate_castle_move(castle),
-            _ => false,
+            Move::Castle(castle) => self.validate_castle_move(castle),
         }
     }
 
@@ -280,6 +278,54 @@ impl Game {
             && self.validate_pawn_normal_move(&mv.pawn)
     }
 
-    // TODO:
-    // fn validate_castle_move(&self, mv: &CastleMove) -> bool {}
+    fn validate_castle_move(&self, mv: &CastleMove) -> bool {
+        let (me, opponent, king_from, pass_thru, king_to, rook_from) = match mv {
+            CastleMove::WhiteKingSide => (
+                Color::White,
+                Color::Black,
+                Position(0, 4),
+                Position(0, 5),
+                Position(0, 6),
+                Position(0, 7),
+            ),
+            CastleMove::WhiteQueenSide => (
+                Color::White,
+                Color::Black,
+                Position(0, 4),
+                Position(0, 3),
+                Position(0, 2),
+                Position(0, 0),
+            ),
+            CastleMove::BlackKingSide => (
+                Color::Black,
+                Color::White,
+                Position(7, 4),
+                Position(7, 5),
+                Position(7, 6),
+                Position(7, 7),
+            ),
+            &CastleMove::BlackQueenSide => (
+                Color::Black,
+                Color::White,
+                Position(7, 4),
+                Position(7, 3),
+                Position(7, 2),
+                Position(7, 0),
+            ),
+        };
+
+        self.castling_rights.white_king
+            && self.turn == me
+            && self
+                .board
+                .is_position_piece(&king_from, &Piece(me.clone(), Type::King))
+            && self
+                .board
+                .is_position_piece(&rook_from, &Piece(me.clone(), Type::Rook))
+            && self.board.is_position_empty(&pass_thru)
+            && self.board.is_position_empty(&king_to)
+            && !self.board.is_position_in_check(&king_from, &Color::Black)
+            && !self.board.is_position_in_check(&pass_thru, &Color::Black)
+            && !self.board.is_position_in_check(&king_to, &Color::Black)
+    }
 }

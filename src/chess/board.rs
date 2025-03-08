@@ -127,16 +127,16 @@ impl Board {
         self.is_position_empty(position) || self.is_position_color(position, color)
     }
 
-    pub fn is_position_checked(&self, position: &Position, opponent: &Color) -> bool {
+    pub fn is_position_in_check(&self, position: &Position, opponent: &Color) -> bool {
         position.is_valid()
-            && (self.is_position_attacked_by_pawn(position, opponent)
-                || self.is_position_attacked_by_rook_or_queen(position, opponent)
-                || self.is_position_attacked_by_knight(position, opponent)
-                || self.is_position_attacked_by_bishop_or_queen(position, opponent)
-                || self.is_position_attacked_by_king(position, opponent))
+            && (self.is_position_in_check_by_pawn(position, opponent)
+                || self.is_position_in_check_by_rook_or_queen(position, opponent)
+                || self.is_position_in_check_by_knight(position, opponent)
+                || self.is_position_in_check_by_bishop_or_queen(position, opponent)
+                || self.is_position_in_check_by_king(position, opponent))
     }
 
-    fn is_position_attacked_by_pawn(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+    fn is_position_in_check_by_pawn(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
         let rank = match opponent {
             Color::White => x - 1,
             Color::Black => x + 1,
@@ -152,7 +152,7 @@ impl Board {
         })
     }
 
-    fn is_position_attacked_by_rook_or_queen(
+    fn is_position_in_check_by_rook_or_queen(
         &self,
         &Position(x, y): &Position,
         opponent: &Color,
@@ -177,7 +177,7 @@ impl Board {
         false
     }
 
-    fn is_position_attacked_by_knight(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+    fn is_position_in_check_by_knight(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
         let positions = [
             Position(x + 1, y - 2),
             Position(x + 2, y - 1),
@@ -197,7 +197,7 @@ impl Board {
         })
     }
 
-    fn is_position_attacked_by_bishop_or_queen(
+    fn is_position_in_check_by_bishop_or_queen(
         &self,
         &Position(x, y): &Position,
         opponent: &Color,
@@ -222,7 +222,7 @@ impl Board {
         false
     }
 
-    fn is_position_attacked_by_king(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
+    fn is_position_in_check_by_king(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
         let positions = [
             Position(x - 1, y - 1),
             Position(x - 1, y),
@@ -280,7 +280,31 @@ impl Board {
     }
 
     fn apply_castle_move(&mut self, mv: &CastleMove) {
-        self.apply_normal_move(&mv.king);
-        self.apply_normal_move(&mv.rook);
+        match mv {
+            CastleMove::WhiteKingSide => {
+                self.set_piece(&Position(0, 6), Some(Piece(Color::White, Type::King)));
+                self.set_piece(&Position(0, 4), None);
+                self.set_piece(&Position(0, 5), Some(Piece(Color::White, Type::Rook)));
+                self.set_piece(&Position(0, 7), None);
+            }
+            &CastleMove::WhiteQueenSide => {
+                self.set_piece(&Position(0, 2), Some(Piece(Color::White, Type::King)));
+                self.set_piece(&Position(0, 4), None);
+                self.set_piece(&Position(0, 3), Some(Piece(Color::White, Type::Rook)));
+                self.set_piece(&Position(0, 0), None);
+            }
+            CastleMove::BlackKingSide => {
+                self.set_piece(&Position(7, 6), Some(Piece(Color::Black, Type::King)));
+                self.set_piece(&Position(7, 4), None);
+                self.set_piece(&Position(7, 5), Some(Piece(Color::Black, Type::Rook)));
+                self.set_piece(&Position(7, 7), None);
+            }
+            &CastleMove::BlackQueenSide => {
+                self.set_piece(&Position(7, 2), Some(Piece(Color::Black, Type::King)));
+                self.set_piece(&Position(7, 4), None);
+                self.set_piece(&Position(7, 3), Some(Piece(Color::Black, Type::Rook)));
+                self.set_piece(&Position(7, 0), None);
+            }
+        };
     }
 }
