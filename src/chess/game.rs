@@ -12,6 +12,8 @@ pub struct Game {
     castling_rights: CastlingRights,
     full_moves: usize,
     half_moves: usize,
+    white_king_pos: Position,
+    black_king_pos: Position,
 }
 
 impl std::fmt::Display for Game {
@@ -33,18 +35,37 @@ impl Game {
             castling_rights: CastlingRights::new(),
             half_moves: 0,
             full_moves: 0,
+            white_king_pos: Position(0, 4),
+            black_king_pos: Position(7, 4),
         }
     }
 
+    fn set_king_position(&mut self, pos: &Position) {
+        match self.turn {
+            Color::White => self.white_king_pos = pos.clone(),
+            Color::Black => self.black_king_pos = pos.clone(),
+        }
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // MAKE MOVE
+    ///////////////////////////////////////////////////////////////////////////
+
     pub fn make_move(&mut self, mv: &Move) {
+        self.en_passant = None;
         if self.turn == Color::Black {
             self.full_moves += 1;
         }
         self.half_moves += 1;
         self.turn = self.turn.opposite();
-        self.board.apply_move(mv);
-        self.update_en_passant(mv);
-        self.update_castling_rights(mv);
+
+        match mv {
+            Move::Normal(mv) => self.make_normal_move(mv),
+            Move::DoubleAdvance(mv) => self.make_double_advance_move(mv),
+            Move::EnPassant(mv) => self.make_en_passant_move(mv),
+            Move::Promotion(mv) => self.make_promotion_move(mv),
+            Move::Castle(mv) => self.make_castle_move(mv),
+        }
     }
 
     pub fn make_move_copy(&self, mv: &Move) -> Game {
@@ -53,27 +74,90 @@ impl Game {
         new_game
     }
 
-    fn update_en_passant(&mut self, mv: &Move) {
-        self.en_passant = match mv {
-            Move::DoubleAdvance(mv) => Some(Position((mv.from.0 + mv.to.0) / 2, mv.from.1)),
-            _ => None,
-        }
-    }
-
-    fn update_castling_rights(&mut self, mv: &Move) {
-        if let Move::Normal(normal) = mv {
-            match self.board.get_piece(&normal.from) {
-                Some(Piece(color, Type::King)) => self.castling_rights.disable_both_sides(color),
-                Some(Piece(color, Type::Rook)) if normal.from.1 == 0 => {
+    fn make_normal_move(&mut self, mv: &NormalMove) {
+        match self.board.get_piece(&mv.from) {
+            Some(Piece(color, Type::King)) => {
+                self.castling_rights.disable_both_sides(color);
+                self.set_king_position(&mv.to);
+            }
+            Some(Piece(color, Type::Rook)) if mv.from.1 == 0 => {
                     self.castling_rights.disable_queen_side(color)
                 }
-                Some(Piece(color, Type::Rook)) if normal.from.1 == 7 => {
+            Some(Piece(color, Type::Rook)) if mv.from.1 == 7 => {
                     self.castling_rights.disable_king_side(color)
                 }
                 _ => (),
             }
-        }
+        self.board
+            .set_piece(&mv.to, self.board.get_piece(&mv.from).clone());
+        self.board.set_piece(&mv.from, None);
     }
+
+    fn make_double_advance_move(&mut self, mv: &DoubleAdvanceMove) {
+        self.en_passant = Some(Position((mv.from.0 + mv.to.0) / 2, mv.from.1));
+        self.board
+            .set_piece(&mv.to, self.board.get_piece(&mv.from).clone());
+        self.board.set_piece(&mv.from, None);
+    }
+
+    fn make_en_passant_move(&mut self, mv: &EnPassantMove) {
+        self.board
+            .set_piece(&mv.to, self.board.get_piece(&mv.from).clone());
+        self.board.set_piece(&mv.from, None);
+        self.board.set_piece(&Position(mv.from.0, mv.to.1), None);
+    }
+
+    fn make_promotion_move(&mut self, mv: &PromotionMove) {
+        self.board
+            .set_piece(&mv.pawn.from, Some(mv.promotion.clone()));
+        self.make_normal_move(&mv.pawn);
+    }
+
+    fn make_castle_move(&mut self, mv: &CastleMove) {
+        let (color, king_start, pass_thru, king_end, rook_start) = match mv {
+            CastleMove::WhiteKingSide => (
+                Color::White,
+                Position(0, 4),
+                Position(0, 5),
+                Position(0, 6),
+                Position(0, 7),
+            ),
+            CastleMove::WhiteQueenSide => (
+                Color::White,
+                Position(0, 4),
+                Position(0, 3),
+                Position(0, 2),
+                Position(0, 0),
+            ),
+            CastleMove::BlackKingSide => (
+                Color::Black,
+                Position(7, 4),
+                Position(7, 5),
+                Position(7, 6),
+                Position(7, 7),
+            ),
+            CastleMove::BlackQueenSide => (
+                Color::White,
+                Position(7, 4),
+                Position(7, 3),
+                Position(7, 2),
+                Position(7, 0),
+            ),
+        };
+
+        self.set_king_position(&king_end);
+        self.castling_rights.disable_both_sides(&color);
+        self.board
+            .set_piece(&king_end, Some(Piece(color.clone(), Type::King)));
+        self.board.set_piece(&king_start, None);
+        self.board
+            .set_piece(&pass_thru, Some(Piece(color, Type::Rook)));
+        self.board.set_piece(&rook_start, None);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // VALIDATE MOVE
+    ///////////////////////////////////////////////////////////////////////////
 
     pub fn validate_move(&self, mv: &Move) -> bool {
         match mv {

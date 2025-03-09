@@ -97,7 +97,7 @@ impl Board {
             .unwrap_or(&None)
     }
 
-    fn set_piece(&mut self, &Position(x, y): &Position, piece: Option<Piece>) {
+    pub fn set_piece(&mut self, &Position(x, y): &Position, piece: Option<Piece>) {
         if let Some(cell) = self
             .0
             .get_mut(x as usize)
@@ -108,7 +108,7 @@ impl Board {
     }
 
     pub fn is_position_empty(&self, position: &Position) -> bool {
-        self.get_piece(position).is_none()
+        position.is_valid() && self.get_piece(position).is_none()
     }
 
     pub fn is_position_piece(&self, position: &Position, piece: &Piece) -> bool {
@@ -170,7 +170,7 @@ impl Board {
                         return true
                     }
                     _ => break,
-                };
+                }
             }
         }
 
@@ -215,7 +215,7 @@ impl Board {
                         return true
                     }
                     _ => break,
-                };
+                }
             }
         }
 
@@ -240,71 +240,5 @@ impl Board {
                 Some(Piece(color, Type::King)) if *color == *opponent,
             )
         })
-    }
-
-    pub fn apply_move(&mut self, mv: &Move) {
-        match mv {
-            Move::Normal(mv) => self.apply_normal_move(mv),
-            Move::DoubleAdvance(mv) => self.apply_double_advance_move(mv),
-            Move::EnPassant(mv) => self.apply_en_passant_move(mv),
-            Move::Promotion(mv) => self.apply_promotion_move(mv),
-            Move::Castle(mv) => self.apply_castle_move(mv),
-        }
-    }
-
-    pub fn apply_move_copy(&self, mv: &Move) -> Board {
-        let mut new_board = self.clone();
-        new_board.apply_move(mv);
-        new_board
-    }
-
-    fn apply_normal_move(&mut self, mv: &NormalMove) {
-        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
-        self.set_piece(&mv.from, None);
-    }
-
-    fn apply_double_advance_move(&mut self, mv: &DoubleAdvanceMove) {
-        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
-        self.set_piece(&mv.from, None);
-    }
-
-    fn apply_en_passant_move(&mut self, mv: &EnPassantMove) {
-        self.set_piece(&mv.to, self.get_piece(&mv.from).clone());
-        self.set_piece(&mv.from, None);
-        self.set_piece(&Position(mv.from.0, mv.to.1), None);
-    }
-
-    fn apply_promotion_move(&mut self, mv: &PromotionMove) {
-        self.set_piece(&mv.pawn.from, Some(mv.promotion.clone()));
-        self.apply_normal_move(&mv.pawn);
-    }
-
-    fn apply_castle_move(&mut self, mv: &CastleMove) {
-        match mv {
-            CastleMove::WhiteKingSide => {
-                self.set_piece(&Position(0, 6), Some(Piece(Color::White, Type::King)));
-                self.set_piece(&Position(0, 4), None);
-                self.set_piece(&Position(0, 5), Some(Piece(Color::White, Type::Rook)));
-                self.set_piece(&Position(0, 7), None);
-            }
-            &CastleMove::WhiteQueenSide => {
-                self.set_piece(&Position(0, 2), Some(Piece(Color::White, Type::King)));
-                self.set_piece(&Position(0, 4), None);
-                self.set_piece(&Position(0, 3), Some(Piece(Color::White, Type::Rook)));
-                self.set_piece(&Position(0, 0), None);
-            }
-            CastleMove::BlackKingSide => {
-                self.set_piece(&Position(7, 6), Some(Piece(Color::Black, Type::King)));
-                self.set_piece(&Position(7, 4), None);
-                self.set_piece(&Position(7, 5), Some(Piece(Color::Black, Type::Rook)));
-                self.set_piece(&Position(7, 7), None);
-            }
-            &CastleMove::BlackQueenSide => {
-                self.set_piece(&Position(7, 2), Some(Piece(Color::Black, Type::King)));
-                self.set_piece(&Position(7, 4), None);
-                self.set_piece(&Position(7, 3), Some(Piece(Color::Black, Type::Rook)));
-                self.set_piece(&Position(7, 0), None);
-            }
-        };
     }
 }
