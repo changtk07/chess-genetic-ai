@@ -47,37 +47,43 @@ impl CastlingRights {
     }
 }
 
+#[derive(Clone)]
 pub enum Move {
-    Normal(NormalMove),
-    DoubleAdvance(DoubleAdvanceMove),
-    EnPassant(EnPassantMove),
-    Promotion(PromotionMove),
-    Castle(CastleMove),
+    Standard(StandardMove),
+    PawnDoubleAdvance(PawnDoubleAdvanceMove),
+    PawnEnPassant(PawnEnPassantMove),
+    PawnPromotion(PawnPromotionMove),
+    Castling(CastlingMove),
 }
 
-pub struct NormalMove {
+#[derive(Clone)]
+pub struct StandardMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct DoubleAdvanceMove {
+#[derive(Clone)]
+pub struct PawnDoubleAdvanceMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct EnPassantMove {
+#[derive(Clone)]
+pub struct PawnEnPassantMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct PromotionMove {
-    pub pawn: NormalMove,
+#[derive(Clone)]
+pub struct PawnPromotionMove {
+    pub pawn: StandardMove,
     pub promotion: Piece,
 }
 
-pub enum CastleMove {
-    WhiteKingSide,
-    WhiteQueenSide,
-    BlackKingSide,
-    BlackQueenSide,
+#[derive(Clone)]
+pub enum CastlingMove {
+    WhiteKing,
+    WhiteQueen,
+    BlackKing,
+    BlackQueen,
 }

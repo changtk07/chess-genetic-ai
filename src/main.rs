@@ -1,7 +1,7 @@
-use chess::Game;
+use chess::State;
 
 mod chess;
 fn main() {
-    let game = Game::new();
+    let game = State::new();
     println!("{}", game);
 }
