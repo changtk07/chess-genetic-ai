@@ -1,5 +1,5 @@
 #[derive(Clone, PartialEq)]
-pub enum Type {
+pub enum PieceType {
     Pawn,
     Rook,
     Knight,
@@ -25,33 +25,24 @@ impl std::fmt::Display for Color {
     }
 }
 
-impl Color {
-    pub fn opposite(&self) -> Color {
-        match self {
-            Color::White => Color::Black,
-            Color::Black => Color::White,
-        }
-    }
-}
-
 #[derive(Clone, PartialEq)]
-pub struct Piece(pub Color, pub Type);
+pub struct Piece(pub Color, pub PieceType);
 
 impl std::fmt::Display for Piece {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Piece(Color::White, Type::Pawn) => "P",
-            Piece(Color::White, Type::Rook) => "R",
-            Piece(Color::White, Type::Knight) => "N",
-            Piece(Color::White, Type::Bishop) => "B",
-            Piece(Color::White, Type::Queen) => "Q",
-            Piece(Color::White, Type::King) => "K",
-            Piece(Color::Black, Type::Pawn) => "p",
-            Piece(Color::Black, Type::Rook) => "r",
-            Piece(Color::Black, Type::Knight) => "n",
-            Piece(Color::Black, Type::Bishop) => "b",
-            Piece(Color::Black, Type::Queen) => "q",
-            Piece(Color::Black, Type::King) => "k",
+            Piece(Color::White, PieceType::Pawn) => "P",
+            Piece(Color::White, PieceType::Rook) => "R",
+            Piece(Color::White, PieceType::Knight) => "N",
+            Piece(Color::White, PieceType::Bishop) => "B",
+            Piece(Color::White, PieceType::Queen) => "Q",
+            Piece(Color::White, PieceType::King) => "K",
+            Piece(Color::Black, PieceType::Pawn) => "p",
+            Piece(Color::Black, PieceType::Rook) => "r",
+            Piece(Color::Black, PieceType::Knight) => "n",
+            Piece(Color::Black, PieceType::Bishop) => "b",
+            Piece(Color::Black, PieceType::Queen) => "q",
+            Piece(Color::Black, PieceType::King) => "k",
         };
 
         write!(f, "{}", s)
@@ -63,7 +54,7 @@ impl Piece {
         &self.0
     }
 
-    pub fn kind(&self) -> &Type {
+    pub fn kind(&self) -> &PieceType {
         &self.1
     }
 }
