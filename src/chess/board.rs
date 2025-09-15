@@ -1,7 +1,4 @@
-use super::piece::{Color, Piece, Type};
-use super::r#move::{
-    CastleMove, DoubleAdvanceMove, EnPassantMove, Move, NormalMove, PromotionMove,
-};
+use super::piece::*;
 
 #[derive(Clone, PartialEq)]
 pub struct Position(pub i8, pub i8);
@@ -43,48 +40,48 @@ impl Board {
     pub fn new() -> Board {
         const INITIAL_BOARD: [[Option<Piece>; 8]; 8] = [
             [
-                Some(Piece(Color::White, Type::Rook)),
-                Some(Piece(Color::White, Type::Knight)),
-                Some(Piece(Color::White, Type::Bishop)),
-                Some(Piece(Color::White, Type::Queen)),
-                Some(Piece(Color::White, Type::King)),
-                Some(Piece(Color::White, Type::Bishop)),
-                Some(Piece(Color::White, Type::Knight)),
-                Some(Piece(Color::White, Type::Rook)),
+                Some(Piece(Color::White, PieceType::Rook)),
+                Some(Piece(Color::White, PieceType::Knight)),
+                Some(Piece(Color::White, PieceType::Bishop)),
+                Some(Piece(Color::White, PieceType::Queen)),
+                Some(Piece(Color::White, PieceType::King)),
+                Some(Piece(Color::White, PieceType::Bishop)),
+                Some(Piece(Color::White, PieceType::Knight)),
+                Some(Piece(Color::White, PieceType::Rook)),
             ],
             [
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
-                Some(Piece(Color::White, Type::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
+                Some(Piece(Color::White, PieceType::Pawn)),
             ],
             [None, None, None, None, None, None, None, None],
             [None, None, None, None, None, None, None, None],
             [None, None, None, None, None, None, None, None],
             [None, None, None, None, None, None, None, None],
             [
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
-                Some(Piece(Color::Black, Type::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
+                Some(Piece(Color::Black, PieceType::Pawn)),
             ],
             [
-                Some(Piece(Color::Black, Type::Rook)),
-                Some(Piece(Color::Black, Type::Knight)),
-                Some(Piece(Color::Black, Type::Bishop)),
-                Some(Piece(Color::Black, Type::Queen)),
-                Some(Piece(Color::Black, Type::King)),
-                Some(Piece(Color::Black, Type::Bishop)),
-                Some(Piece(Color::Black, Type::Knight)),
-                Some(Piece(Color::Black, Type::Rook)),
+                Some(Piece(Color::Black, PieceType::Rook)),
+                Some(Piece(Color::Black, PieceType::Knight)),
+                Some(Piece(Color::Black, PieceType::Bishop)),
+                Some(Piece(Color::Black, PieceType::Queen)),
+                Some(Piece(Color::Black, PieceType::King)),
+                Some(Piece(Color::Black, PieceType::Bishop)),
+                Some(Piece(Color::Black, PieceType::Knight)),
+                Some(Piece(Color::Black, PieceType::Rook)),
             ],
         ];
         Board(INITIAL_BOARD)
@@ -104,6 +101,17 @@ impl Board {
             .and_then(|row| row.get_mut(y as usize))
         {
             *cell = piece;
+        }
+    }
+
+    pub fn for_each<F>(&self, mut f: F)
+    where
+        F: FnMut(&Position, &Option<Piece>),
+    {
+        for (x, row) in self.0.iter().enumerate() {
+            for (y, piece) in row.iter().enumerate() {
+                f(&Position(x as i8, y as i8), piece)
+            }
         }
     }
 
@@ -147,7 +155,7 @@ impl Board {
         positions.iter().any(|pos| {
             matches!(
                 self.get_piece(pos),
-                Some(Piece(color, Type::Pawn)) if *color == *opponent,
+                Some(Piece(color, PieceType::Pawn)) if *color == *opponent,
             )
         })
     }
@@ -166,7 +174,7 @@ impl Board {
 
                 match self.get_piece(&pos) {
                     None => continue,
-                    Some(Piece(color, Type::Rook | Type::Queen)) if color == opponent => {
+                    Some(Piece(color, PieceType::Rook | PieceType::Queen)) if color == opponent => {
                         return true
                     }
                     _ => break,
@@ -192,7 +200,7 @@ impl Board {
         positions.iter().any(|pos| {
             matches!(
                 self.get_piece(pos),
-                Some(Piece(color, Type::Knight)) if *color == *opponent,
+                Some(Piece(color, PieceType::Knight)) if *color == *opponent,
             )
         })
     }
@@ -211,7 +219,9 @@ impl Board {
 
                 match self.get_piece(&pos) {
                     None => continue,
-                    Some(Piece(color, Type::Bishop | Type::Queen)) if color == opponent => {
+                    Some(Piece(color, PieceType::Bishop | PieceType::Queen))
+                        if color == opponent =>
+                    {
                         return true
                     }
                     _ => break,
@@ -237,7 +247,7 @@ impl Board {
         positions.iter().any(|pos| {
             matches!(
                 self.get_piece(pos),
-                Some(Piece(color, Type::King)) if *color == *opponent,
+                Some(Piece(color, PieceType::King)) if *color == *opponent,
             )
         })
     }

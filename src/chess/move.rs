@@ -1,5 +1,5 @@
 use super::board::Position;
-use super::piece::{Color, Piece};
+use super::piece::*;
 
 #[derive(Clone)]
 pub struct CastlingRights {
@@ -47,37 +47,66 @@ impl CastlingRights {
     }
 }
 
+#[derive(Clone)]
 pub enum Move {
-    Normal(NormalMove),
-    DoubleAdvance(DoubleAdvanceMove),
-    EnPassant(EnPassantMove),
-    Promotion(PromotionMove),
-    Castle(CastleMove),
+    Standard(StandardMove),
+    PawnDoubleAdvance(PawnDoubleAdvanceMove),
+    PawnEnPassant(PawnEnPassantMove),
+    PawnPromotion(PawnPromotionMove),
+    Castling(CastlingMove),
 }
 
-pub struct NormalMove {
+impl Move {
+    pub fn all_pawn_promotions(pawn: &StandardMove, color: &Color) -> Vec<Move> {
+        vec![
+            Move::PawnPromotion(PawnPromotionMove {
+                pawn: pawn.clone(),
+                promotion: Piece(color.clone(), PieceType::Rook),
+            }),
+            Move::PawnPromotion(PawnPromotionMove {
+                pawn: pawn.clone(),
+                promotion: Piece(color.clone(), PieceType::Knight),
+            }),
+            Move::PawnPromotion(PawnPromotionMove {
+                pawn: pawn.clone(),
+                promotion: Piece(color.clone(), PieceType::Bishop),
+            }),
+            Move::PawnPromotion(PawnPromotionMove {
+                pawn: pawn.clone(),
+                promotion: Piece(color.clone(), PieceType::Queen),
+            }),
+        ]
+    }
+}
+
+#[derive(Clone)]
+pub struct StandardMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct DoubleAdvanceMove {
+#[derive(Clone)]
+pub struct PawnDoubleAdvanceMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct EnPassantMove {
+#[derive(Clone)]
+pub struct PawnEnPassantMove {
     pub from: Position,
     pub to: Position,
 }
 
-pub struct PromotionMove {
-    pub pawn: NormalMove,
+#[derive(Clone)]
+pub struct PawnPromotionMove {
+    pub pawn: StandardMove,
     pub promotion: Piece,
 }
 
-pub enum CastleMove {
-    WhiteKingSide,
-    WhiteQueenSide,
-    BlackKingSide,
-    BlackQueenSide,
+#[derive(Clone)]
+pub enum CastlingMove {
+    WhiteKing,
+    WhiteQueen,
+    BlackKing,
+    BlackQueen,
 }
