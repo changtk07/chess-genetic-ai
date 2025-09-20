@@ -362,7 +362,7 @@ impl State {
     }
 
     fn validate_castle_move(&self, mv: &CastlingMove) -> bool {
-        let (me, opponent, king_from, pass_thru, king_to, rook_from) = match mv {
+        let (me, _, king_from, pass_thru, king_to, rook_from) = match mv {
             CastlingMove::WhiteKing => (
                 Color::White,
                 Color::Black,
@@ -416,7 +416,19 @@ impl State {
     // AVAILABLE MOVES
     ///////////////////////////////////////////////////////////////////////////
 
-    pub fn get_moves(&self) -> Vec<Move> {
+    pub fn get_moves_and_state(&self) -> Vec<(Move, State)> {
+        let moves = self.get_moves();
+        let mut moves_and_states = Vec::new();
+
+        moves.into_iter().for_each(|mv| {
+            let new_state = self.make_move_copy(&mv);
+            moves_and_states.push((mv, new_state));
+        });
+
+        moves_and_states
+    }
+
+    fn get_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
 
         self.board.for_each(|pos, piece| {
