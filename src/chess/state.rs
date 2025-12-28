@@ -159,7 +159,7 @@ impl State {
     ///////////////////////////////////////////////////////////////////////////
 
     pub fn validate_move(&self, mv: &Move) -> bool {
-        match mv {
+        let is_pseudo_legal = match mv {
             Move::Standard(normal) => self.validate_normal_move(normal),
             Move::PawnDoubleAdvance(double_advance) => {
                 self.validate_double_advance_move(double_advance)
@@ -167,7 +167,21 @@ impl State {
             Move::PawnEnPassant(en_passant) => self.validate_en_passant_move(en_passant),
             Move::PawnPromotion(promotion) => self.validate_promotion_move(promotion),
             Move::Castling(castling) => self.validate_castling_move(castling),
+        };
+
+        if !is_pseudo_legal {
+            return false;
         }
+
+        let new_state = self.make_move_copy(mv);
+        let king_pos = match self.player {
+            Color::White => &new_state.white_king_pos,
+            Color::Black => &new_state.black_king_pos,
+        };
+
+        !new_state
+            .board
+            .is_position_in_check(king_pos, &new_state.player)
     }
 
     fn validate_normal_move(&self, mv: &StandardMove) -> bool {
