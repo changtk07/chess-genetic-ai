@@ -430,11 +430,11 @@ impl State {
             &CastlingMove::BlackQueen => {
                 self.player == Color::Black
                     && self.castling_rights.black_queen
-            && self
-                .board
+                    && self
+                        .board
                         .is_position_piece(&Position(7, 4), &Piece(Color::Black, PieceType::King))
-            && self
-                .board
+                    && self
+                        .board
                         .is_position_piece(&Position(7, 0), &Piece(Color::Black, PieceType::Rook))
                     && self.board.is_position_empty(&Position(7, 3))
                     && self.board.is_position_empty(&Position(7, 2))
@@ -705,23 +705,17 @@ impl State {
             }));
         }
 
-        match self.player {
-            Color::White => {
-                if self.castling_rights.white_king {
-                    moves.push(Move::Castling(CastlingMove::WhiteKing));
-                }
-                if self.castling_rights.white_queen {
-                    moves.push(Move::Castling(CastlingMove::WhiteQueen));
-                }
-            }
-            Color::Black => {
-                if self.castling_rights.black_king {
-                    moves.push(Move::Castling(CastlingMove::BlackKing));
-                }
-                if self.castling_rights.black_queen {
-                    moves.push(Move::Castling(CastlingMove::BlackQueen));
-                }
-            }
+        if self.validate_castling_move(&CastlingMove::WhiteKing) {
+            moves.push(Move::Castling(CastlingMove::WhiteKing));
+        }
+        if self.validate_castling_move(&CastlingMove::WhiteQueen) {
+            moves.push(Move::Castling(CastlingMove::WhiteQueen));
+        }
+        if self.validate_castling_move(&CastlingMove::BlackKing) {
+            moves.push(Move::Castling(CastlingMove::BlackKing));
+        }
+        if self.validate_castling_move(&CastlingMove::BlackQueen) {
+            moves.push(Move::Castling(CastlingMove::BlackQueen));
         }
 
         moves
