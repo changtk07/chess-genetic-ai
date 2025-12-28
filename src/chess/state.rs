@@ -171,13 +171,14 @@ impl State {
     }
 
     fn validate_normal_move(&self, mv: &StandardMove) -> bool {
-        if !mv.from.is_valid() || !mv.to.is_valid() || mv.from == mv.to {
-            return false;
-        }
-
         let piece = match self.board.get_piece(&mv.from) {
             Some(piece) if *piece.color() == self.player => piece,
             _ => return false,
+        };
+
+        match self.board.get_piece(&mv.to) {
+            Some(piece) if *piece.color() == self.player => return false,
+            _ => (),
         };
 
         match piece.kind() {
@@ -289,23 +290,16 @@ impl State {
     }
 
     fn validate_double_advance_move(&self, mv: &PawnDoubleAdvanceMove) -> bool {
-        if !mv.from.is_valid()
-            || !mv.to.is_valid()
-            || !self
-                .board
-                .is_position_piece(&mv.from, &Piece(self.player.clone(), PieceType::Pawn))
-        {
-            return false;
-        }
-
-        let (start_rank, forward_one, forward_two) = match self.player {
+        let (start_rank, pawn, forward_one, forward_two) = match self.player {
             Color::White => (
                 1,
+                Piece(Color::White, PieceType::Pawn),
                 Position(mv.from.0 + 1, mv.from.1),
                 Position(mv.from.0 + 2, mv.from.1),
             ),
             Color::Black => (
                 6,
+                Piece(Color::Black, PieceType::Pawn),
                 Position(mv.from.0 - 1, mv.from.1),
                 Position(mv.from.0 - 2, mv.from.1),
             ),
@@ -313,12 +307,18 @@ impl State {
 
         mv.from.0 == start_rank
             && mv.to == forward_two
+            && self.board.is_position_piece(&mv.from, &pawn)
             && self.board.is_position_empty(&forward_one)
             && self.board.is_position_empty(&mv.to)
     }
 
     fn validate_en_passant_move(&self, mv: &PawnEnPassantMove) -> bool {
-        if !mv.from.is_valid() || !mv.to.is_valid() || mv.from == mv.to {
+        if !self.board.is_position_empty(&mv.to)
+            || !self.board.is_position_piece(
+                &Position(mv.from.0, mv.to.1),
+                &Piece(self.opponent.clone(), PieceType::Pawn),
+            )
+        {
             return false;
         }
 
@@ -466,9 +466,11 @@ impl State {
                 Color::White => &new_state.white_king_pos,
                 Color::Black => &new_state.black_king_pos,
             };
+
+            // Prevent moves that leave king in check
             if !new_state
                 .board
-                .is_position_in_check(king_pos, &self.opponent)
+                .is_position_in_check(king_pos, &new_state.player)
             {
                 moves_and_states.push((mv, new_state));
             }
