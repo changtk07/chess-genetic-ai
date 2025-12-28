@@ -136,7 +136,7 @@ impl State {
                 Position(7, 7),
             ),
             CastlingMove::BlackQueen => (
-                Color::White,
+                Color::Black,
                 Position(7, 4),
                 Position(7, 3),
                 Position(7, 2),
@@ -335,7 +335,7 @@ impl State {
         };
 
         // Check mv.from file is valid
-        if mv.from.1 != en_passant.0 + 1 && mv.from.1 != en_passant.0 - 1 {
+        if mv.from.1 != en_passant.1 + 1 && mv.from.1 != en_passant.1 - 1 {
             return false;
         }
 
@@ -362,42 +362,59 @@ impl State {
     }
 
     fn validate_castle_move(&self, mv: &CastlingMove) -> bool {
-        let (me, opponent, king_from, pass_thru, king_to, rook_from) = match mv {
+        let (
+            has_castling_right,
+            me,
+            opponent,
+            king_from,
+            pass_thru_1,
+            pass_thru_2,
+            king_to,
+            rook_from,
+        ) = match mv {
             CastlingMove::WhiteKing => (
+                self.castling_rights.white_king,
                 Color::White,
                 Color::Black,
                 Position(0, 4),
                 Position(0, 5),
                 Position(0, 6),
+                Position(0, 6),
                 Position(0, 7),
             ),
             CastlingMove::WhiteQueen => (
+                self.castling_rights.white_queen,
                 Color::White,
                 Color::Black,
                 Position(0, 4),
                 Position(0, 3),
                 Position(0, 2),
+                Position(0, 1),
                 Position(0, 0),
             ),
             CastlingMove::BlackKing => (
+                self.castling_rights.black_king,
                 Color::Black,
                 Color::White,
                 Position(7, 4),
                 Position(7, 5),
                 Position(7, 6),
+                Position(7, 6),
                 Position(7, 7),
             ),
             &CastlingMove::BlackQueen => (
+                self.castling_rights.black_queen,
                 Color::Black,
                 Color::White,
                 Position(7, 4),
                 Position(7, 3),
                 Position(7, 2),
+                Position(7, 1),
                 Position(7, 0),
             ),
         };
 
-        self.castling_rights.white_king
+        has_castling_right
             && self.player == me
             && self
                 .board
@@ -405,18 +422,32 @@ impl State {
             && self
                 .board
                 .is_position_piece(&rook_from, &Piece(me.clone(), PieceType::Rook))
-            && self.board.is_position_empty(&pass_thru)
+            && self.board.is_position_empty(&pass_thru_1)
+            && self.board.is_position_empty(&pass_thru_2)
             && self.board.is_position_empty(&king_to)
-            && !self.board.is_position_in_check(&king_from, &Color::Black)
-            && !self.board.is_position_in_check(&pass_thru, &Color::Black)
-            && !self.board.is_position_in_check(&king_to, &Color::Black)
+            && !self.board.is_position_in_check(&king_from, &opponent)
+            && !self.board.is_position_in_check(&pass_thru_1, &opponent)
+            && !self.board.is_position_in_check(&pass_thru_2, &opponent)
+            && !self.board.is_position_in_check(&king_to, &opponent)
     }
 
     ///////////////////////////////////////////////////////////////////////////
     // AVAILABLE MOVES
     ///////////////////////////////////////////////////////////////////////////
 
-    pub fn get_moves(&self) -> Vec<Move> {
+    pub fn get_moves_and_state(&self) -> Vec<(Move, State)> {
+        let moves = self.get_moves();
+        let mut moves_and_states = Vec::new();
+
+        moves.into_iter().for_each(|mv| {
+            let new_state = self.make_move_copy(&mv);
+            moves_and_states.push((mv, new_state));
+        });
+
+        moves_and_states
+    }
+
+    fn get_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
 
         self.board.for_each(|pos, piece| {
@@ -571,12 +602,13 @@ impl State {
             Position(x - 2, y - 1),
             Position(x - 1, y - 2),
         ] {
-            if pos.is_valid() {
-                moves.push(Move::Standard(StandardMove {
-                    from: Position(x, y),
-                    to: pos,
-                }));
+            if !pos.is_valid() || self.board.is_position_color(&pos, &self.player) {
+                continue;
             }
+            moves.push(Move::Standard(StandardMove {
+                from: Position(x, y),
+                to: pos,
+            }));
         }
 
         moves
@@ -634,7 +666,7 @@ impl State {
             Position(x - 1, y),
             Position(x - 1, y + 1),
         ] {
-            if !pos.is_valid() {
+            if !pos.is_valid() || self.board.is_position_color(&pos, &self.player) {
                 continue;
             }
             moves.push(Move::Standard(StandardMove {
