@@ -52,7 +52,7 @@ impl State {
             Move::PawnDoubleAdvance(mv) => self.make_double_advance_move(mv),
             Move::PawnEnPassant(mv) => self.make_en_passant_move(mv),
             Move::PawnPromotion(mv) => self.make_promotion_move(mv),
-            Move::Castling(mv) => self.make_castle_move(mv),
+            Move::Castling(mv) => self.make_castling_move(mv),
         }
 
         std::mem::swap(&mut self.player, &mut self.opponent);
@@ -105,7 +105,7 @@ impl State {
         self.make_normal_move(&mv.pawn);
     }
 
-    fn make_castle_move(&mut self, mv: &CastlingMove) {
+    fn make_castling_move(&mut self, mv: &CastlingMove) {
         let (color, king_start, pass_thru, king_end, rook_start) = match mv {
             CastlingMove::WhiteKing => (
                 Color::White,
@@ -166,7 +166,7 @@ impl State {
             }
             Move::PawnEnPassant(en_passant) => self.validate_en_passant_move(en_passant),
             Move::PawnPromotion(promotion) => self.validate_promotion_move(promotion),
-            Move::Castling(castle) => self.validate_castle_move(castle),
+            Move::Castling(castling) => self.validate_castling_move(castling),
         }
     }
 
@@ -361,74 +361,95 @@ impl State {
             && self.validate_pawn_normal_move(&mv.pawn)
     }
 
-    fn validate_castle_move(&self, mv: &CastlingMove) -> bool {
-        let (
-            has_castling_right,
-            me,
-            opponent,
-            king_from,
-            pass_thru_1,
-            pass_thru_2,
-            king_to,
-            rook_from,
-        ) = match mv {
-            CastlingMove::WhiteKing => (
-                self.castling_rights.white_king,
-                Color::White,
-                Color::Black,
-                Position(0, 4),
-                Position(0, 5),
-                Position(0, 6),
-                Position(0, 6),
-                Position(0, 7),
-            ),
-            CastlingMove::WhiteQueen => (
-                self.castling_rights.white_queen,
-                Color::White,
-                Color::Black,
-                Position(0, 4),
-                Position(0, 3),
-                Position(0, 2),
-                Position(0, 1),
-                Position(0, 0),
-            ),
-            CastlingMove::BlackKing => (
-                self.castling_rights.black_king,
-                Color::Black,
-                Color::White,
-                Position(7, 4),
-                Position(7, 5),
-                Position(7, 6),
-                Position(7, 6),
-                Position(7, 7),
-            ),
-            &CastlingMove::BlackQueen => (
-                self.castling_rights.black_queen,
-                Color::Black,
-                Color::White,
-                Position(7, 4),
-                Position(7, 3),
-                Position(7, 2),
-                Position(7, 1),
-                Position(7, 0),
-            ),
-        };
-
-        has_castling_right
-            && self.player == me
+    fn validate_castling_move(&self, mv: &CastlingMove) -> bool {
+        match mv {
+            CastlingMove::WhiteKing => {
+                self.player == Color::White
+                    && self.castling_rights.white_king
+                    && self
+                        .board
+                        .is_position_piece(&Position(0, 4), &Piece(Color::White, PieceType::King))
+                    && self
+                        .board
+                        .is_position_piece(&Position(0, 7), &Piece(Color::White, PieceType::Rook))
+                    && self.board.is_position_empty(&Position(0, 5))
+                    && self.board.is_position_empty(&Position(0, 6))
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 4), &Color::Black)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 5), &Color::Black)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 6), &Color::Black)
+            }
+            CastlingMove::WhiteQueen => {
+                self.player == Color::White
+                    && self.castling_rights.white_queen
+                    && self
+                        .board
+                        .is_position_piece(&Position(0, 4), &Piece(Color::White, PieceType::King))
+                    && self
+                        .board
+                        .is_position_piece(&Position(0, 0), &Piece(Color::White, PieceType::Rook))
+                    && self.board.is_position_empty(&Position(0, 3))
+                    && self.board.is_position_empty(&Position(0, 2))
+                    && self.board.is_position_empty(&Position(0, 1))
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 4), &Color::Black)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 3), &Color::Black)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(0, 2), &Color::Black)
+            }
+            CastlingMove::BlackKing => {
+                self.player == Color::Black
+                    && self.castling_rights.black_king
+                    && self
+                        .board
+                        .is_position_piece(&Position(7, 4), &Piece(Color::Black, PieceType::King))
+                    && self
+                        .board
+                        .is_position_piece(&Position(7, 7), &Piece(Color::Black, PieceType::Rook))
+                    && self.board.is_position_empty(&Position(7, 5))
+                    && self.board.is_position_empty(&Position(7, 6))
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 4), &Color::White)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 5), &Color::White)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 6), &Color::White)
+            }
+            &CastlingMove::BlackQueen => {
+                self.player == Color::Black
+                    && self.castling_rights.black_queen
             && self
                 .board
-                .is_position_piece(&king_from, &Piece(me.clone(), PieceType::King))
+                        .is_position_piece(&Position(7, 4), &Piece(Color::Black, PieceType::King))
             && self
                 .board
-                .is_position_piece(&rook_from, &Piece(me.clone(), PieceType::Rook))
-            && self.board.is_position_empty(&pass_thru_1)
-            && self.board.is_position_empty(&pass_thru_2)
-            && self.board.is_position_empty(&king_to)
-            && !self.board.is_position_in_check(&king_from, &opponent)
-            && !self.board.is_position_in_check(&pass_thru_1, &opponent)
-            && !self.board.is_position_in_check(&pass_thru_2, &opponent)
-            && !self.board.is_position_in_check(&king_to, &opponent)
+                        .is_position_piece(&Position(7, 0), &Piece(Color::Black, PieceType::Rook))
+                    && self.board.is_position_empty(&Position(7, 3))
+                    && self.board.is_position_empty(&Position(7, 2))
+                    && self.board.is_position_empty(&Position(7, 1))
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 4), &Color::White)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 3), &Color::White)
+                    && !self
+                        .board
+                        .is_position_in_check(&Position(7, 2), &Color::White)
+            }
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
