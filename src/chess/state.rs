@@ -40,13 +40,6 @@ impl State {
         }
     }
 
-    fn set_king_position(&mut self, pos: &Position) {
-        match self.player {
-            Color::White => self.white_king_pos = pos.clone(),
-            Color::Black => self.black_king_pos = pos.clone(),
-        }
-    }
-
     ///////////////////////////////////////////////////////////////////////////
     // MAKE MOVE
     ///////////////////////////////////////////////////////////////////////////
@@ -152,6 +145,13 @@ impl State {
         self.board
             .set_piece(&pass_thru, Some(Piece(color, PieceType::Rook)));
         self.board.set_piece(&rook_start, None);
+    }
+
+    fn set_king_position(&mut self, pos: &Position) {
+        match self.player {
+            Color::White => self.white_king_pos = pos.clone(),
+            Color::Black => self.black_king_pos = pos.clone(),
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -432,43 +432,52 @@ impl State {
     }
 
     ///////////////////////////////////////////////////////////////////////////
-    // AVAILABLE MOVES
+    // GENERATE LEGAL MOVES
     ///////////////////////////////////////////////////////////////////////////
 
-    pub fn get_moves_and_state(&self) -> Vec<(Move, State)> {
-        let moves = self.get_moves();
+    pub fn gen_legal_moves(&self) -> Vec<(Move, State)> {
+        let moves = self.gen_potential_legal_moves();
         let mut moves_and_states = Vec::new();
 
         moves.into_iter().for_each(|mv| {
             let new_state = self.make_move_copy(&mv);
-            moves_and_states.push((mv, new_state));
+            let king_pos = match self.player {
+                Color::White => &new_state.white_king_pos,
+                Color::Black => &new_state.black_king_pos,
+            };
+            if !new_state
+                .board
+                .is_position_in_check(king_pos, &self.opponent)
+            {
+                moves_and_states.push((mv, new_state));
+            }
         });
 
         moves_and_states
     }
 
-    fn get_moves(&self) -> Vec<Move> {
+    fn gen_potential_legal_moves(&self) -> Vec<Move> {
         let mut moves = Vec::new();
 
         self.board.for_each(|pos, piece| {
             moves.extend(match piece {
                 Some(Piece(color, PieceType::Pawn)) if *color == self.player => {
-                    self.get_pawn_moves(pos)
+                    self.gen_pawn_moves(pos)
                 }
                 Some(Piece(color, PieceType::Rook)) if *color == self.player => {
-                    self.get_rook_moves(pos)
+                    self.gen_rook_moves(pos)
                 }
                 Some(Piece(color, PieceType::Knight)) if *color == self.player => {
-                    self.get_knight_moves(pos)
+                    self.gen_knight_moves(pos)
                 }
                 Some(Piece(color, PieceType::Bishop)) if *color == self.player => {
-                    self.get_bishop_moves(pos)
+                    self.gen_bishop_moves(pos)
                 }
                 Some(Piece(color, PieceType::Queen)) if *color == self.player => {
-                    self.get_queen_moves(pos)
+                    self.gen_queen_moves(pos)
                 }
                 Some(Piece(color, PieceType::King)) if *color == self.player => {
-                    self.get_king_moves(pos)
+                    self.gen_king_moves(pos)
                 }
                 _ => vec![],
             });
@@ -477,7 +486,7 @@ impl State {
         moves
     }
 
-    fn get_pawn_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_pawn_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
         let (starting_rank, promotion_rank, forward_one, forward_two, capture_left, capture_right) =
@@ -559,7 +568,7 @@ impl State {
         moves
     }
 
-    fn get_rook_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_rook_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
@@ -589,7 +598,7 @@ impl State {
         moves
     }
 
-    fn get_knight_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_knight_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
         for pos in [
@@ -614,7 +623,7 @@ impl State {
         moves
     }
 
-    fn get_bishop_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_bishop_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
         for (dx, dy) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
@@ -644,16 +653,16 @@ impl State {
         moves
     }
 
-    fn get_queen_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_queen_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
-        moves.extend(self.get_rook_moves(&Position(x, y)));
-        moves.extend(self.get_bishop_moves(&Position(x, y)));
+        moves.extend(self.gen_rook_moves(&Position(x, y)));
+        moves.extend(self.gen_bishop_moves(&Position(x, y)));
 
         moves
     }
 
-    fn get_king_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
+    fn gen_king_moves(&self, &Position(x, y): &Position) -> Vec<Move> {
         let mut moves = Vec::new();
 
         for pos in [
