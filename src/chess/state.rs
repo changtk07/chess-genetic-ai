@@ -80,6 +80,13 @@ impl State {
             }
             _ => (),
         }
+        match mv.to {
+            Position(0, 0) => self.castling_rights.white_queen = false,
+            Position(0, 7) => self.castling_rights.white_king = false,
+            Position(7, 0) => self.castling_rights.black_queen = false,
+            Position(7, 7) => self.castling_rights.black_king = false,
+            _ => (),
+        }
         self.board
             .set_piece(&mv.to, self.board.get_piece(&mv.from).clone());
         self.board.set_piece(&mv.from, None);
@@ -159,7 +166,7 @@ impl State {
     ///////////////////////////////////////////////////////////////////////////
 
     pub fn validate_move(&self, mv: &Move) -> bool {
-        let is_pseudo_legal = match mv {
+        if !match mv {
             Move::Standard(normal) => self.validate_normal_move(normal),
             Move::PawnDoubleAdvance(double_advance) => {
                 self.validate_double_advance_move(double_advance)
@@ -167,9 +174,7 @@ impl State {
             Move::PawnEnPassant(en_passant) => self.validate_en_passant_move(en_passant),
             Move::PawnPromotion(promotion) => self.validate_promotion_move(promotion),
             Move::Castling(castling) => self.validate_castling_move(castling),
-        };
-
-        if !is_pseudo_legal {
+        } {
             return false;
         }
 
@@ -185,6 +190,10 @@ impl State {
     }
 
     fn validate_normal_move(&self, mv: &StandardMove) -> bool {
+        if mv.from == mv.to || !mv.from.is_valid() || !mv.to.is_valid() {
+            return false;
+        }
+
         let piece = match self.board.get_piece(&mv.from) {
             Some(piece) if *piece.color() == self.player => piece,
             _ => return false,
@@ -304,6 +313,10 @@ impl State {
     }
 
     fn validate_double_advance_move(&self, mv: &PawnDoubleAdvanceMove) -> bool {
+        if !mv.from.is_valid() || !mv.to.is_valid() || mv.from == mv.to {
+            return false;
+        }
+
         let (start_rank, pawn, forward_one, forward_two) = match self.player {
             Color::White => (
                 1,
