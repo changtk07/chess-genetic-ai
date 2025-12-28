@@ -11,7 +11,7 @@ impl Position {
 
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.0 as u8 + b'a') as char, self.1 + 1)
+        write!(f, "{}{}", (self.1 as u8 + b'a') as char, self.0 + 1)
     }
 }
 
