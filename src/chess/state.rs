@@ -72,10 +72,24 @@ impl State {
                 self.castling_rights.disable_both_sides(color);
                 self.set_king_position(&mv.to);
             }
-            Some(Piece(color, PieceType::Rook)) if mv.from.1 == 0 => {
+            Some(Piece(color, PieceType::Rook))
+                if *color == Color::White && mv.from == Position(0, 0) =>
+            {
                 self.castling_rights.disable_queen_side(color)
             }
-            Some(Piece(color, PieceType::Rook)) if mv.from.1 == 7 => {
+            Some(Piece(color, PieceType::Rook))
+                if *color == Color::White && mv.from == Position(0, 7) =>
+            {
+                self.castling_rights.disable_king_side(color)
+            }
+            Some(Piece(color, PieceType::Rook))
+                if *color == Color::Black && mv.from == Position(7, 0) =>
+            {
+                self.castling_rights.disable_queen_side(color)
+            }
+            Some(Piece(color, PieceType::Rook))
+                if *color == Color::Black && mv.from == Position(7, 7) =>
+            {
                 self.castling_rights.disable_king_side(color)
             }
             _ => (),
