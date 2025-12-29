@@ -125,6 +125,12 @@ impl Board {
             .map_or(false, |got| got == piece)
     }
 
+    pub fn is_position_piece_type(&self, position: &Position, piece_type: &PieceType) -> bool {
+        self.get_piece(position)
+            .as_ref()
+            .map_or(false, |piece| piece.1 == *piece_type)
+    }
+
     pub fn is_position_color(&self, position: &Position, color: &Color) -> bool {
         self.get_piece(position)
             .as_ref()

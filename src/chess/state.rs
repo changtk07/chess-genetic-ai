@@ -9,8 +9,8 @@ pub struct State {
     pub opponent: Color,
     pub en_passant: Option<Position>,
     pub castling_rights: CastlingRights,
-    pub full_moves: usize,
-    pub half_moves: usize,
+    pub fullmove_number: usize,
+    pub halfmove_clock: usize,
     pub white_king_pos: Position,
     pub black_king_pos: Position,
 }
@@ -18,8 +18,8 @@ pub struct State {
 impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "turn: {}", self.player)?;
-        writeln!(f, "full moves: {}", self.full_moves)?;
-        writeln!(f, "half moves: {}", self.half_moves)?;
+        writeln!(f, "full moves: {}", self.fullmove_number)?;
+        writeln!(f, "half moves: {}", self.halfmove_clock)?;
         writeln!(f, "{}", self.board)?;
         Ok(())
     }
@@ -33,8 +33,8 @@ impl State {
             opponent: Color::Black,
             en_passant: None,
             castling_rights: CastlingRights::new(),
-            half_moves: 0,
-            full_moves: 0,
+            halfmove_clock: 0,
+            fullmove_number: 1,
             white_king_pos: Position(0, 4),
             black_king_pos: Position(7, 4),
         }
@@ -45,10 +45,22 @@ impl State {
     ///////////////////////////////////////////////////////////////////////////
 
     pub fn make_move(&mut self, mv: &Move) {
+        let reset_halfmove_clock = match mv {
+            Move::Standard(mv) => {
+                self.board
+                    .is_position_piece_type(&mv.from, &PieceType::Pawn)
+                    || !self.board.is_position_empty(&mv.to)
+            }
+            Move::PawnDoubleAdvance(_) => true,
+            Move::PawnEnPassant(_) => true,
+            Move::PawnPromotion(_) => true,
+            Move::Castling(_) => false,
+        };
+
         self.en_passant = None;
 
         match mv {
-            Move::Standard(mv) => self.make_normal_move(mv),
+            Move::Standard(mv) => self.make_standard_move(mv),
             Move::PawnDoubleAdvance(mv) => self.make_double_advance_move(mv),
             Move::PawnEnPassant(mv) => self.make_en_passant_move(mv),
             Move::PawnPromotion(mv) => self.make_promotion_move(mv),
@@ -56,8 +68,13 @@ impl State {
         }
 
         std::mem::swap(&mut self.player, &mut self.opponent);
-        self.half_moves += 1;
-        self.full_moves = self.half_moves >> 1;
+
+        self.fullmove_number += if self.player == Color::White { 1 } else { 0 };
+        self.halfmove_clock = if reset_halfmove_clock {
+            0
+        } else {
+            self.halfmove_clock + 1
+        };
     }
 
     pub fn make_move_copy(&self, mv: &Move) -> State {
@@ -66,7 +83,7 @@ impl State {
         new_game
     }
 
-    fn make_normal_move(&mut self, mv: &StandardMove) {
+    fn make_standard_move(&mut self, mv: &StandardMove) {
         match self.board.get_piece(&mv.from) {
             Some(Piece(color, PieceType::King)) => {
                 self.castling_rights.disable_both_sides(color);
@@ -123,7 +140,7 @@ impl State {
     fn make_promotion_move(&mut self, mv: &PawnPromotionMove) {
         self.board
             .set_piece(&mv.pawn.from, Some(mv.promotion.clone()));
-        self.make_normal_move(&mv.pawn);
+        self.make_standard_move(&mv.pawn);
     }
 
     fn make_castling_move(&mut self, mv: &CastlingMove) {
@@ -181,7 +198,7 @@ impl State {
 
     pub fn validate_move(&self, mv: &Move) -> bool {
         if !match mv {
-            Move::Standard(normal) => self.validate_normal_move(normal),
+            Move::Standard(standard) => self.validate_standard_move(standard),
             Move::PawnDoubleAdvance(double_advance) => {
                 self.validate_double_advance_move(double_advance)
             }
@@ -203,7 +220,7 @@ impl State {
             .is_position_in_check(king_pos, &new_state.player)
     }
 
-    fn validate_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_standard_move(&self, mv: &StandardMove) -> bool {
         if mv.from == mv.to || !mv.from.is_valid() || !mv.to.is_valid() {
             return false;
         }
@@ -219,16 +236,16 @@ impl State {
         };
 
         match piece.kind() {
-            PieceType::Pawn => self.validate_pawn_normal_move(mv),
-            PieceType::Rook => self.validate_rook_normal_move(mv),
-            PieceType::Knight => self.validate_knight_normal_move(mv),
-            PieceType::Bishop => self.validate_bishop_normal_move(mv),
-            PieceType::Queen => self.validate_queen_normal_move(mv),
-            PieceType::King => self.validate_king_normal_move(mv),
+            PieceType::Pawn => self.validate_pawn_standard_move(mv),
+            PieceType::Rook => self.validate_rook_standard_move(mv),
+            PieceType::Knight => self.validate_knight_standard_move(mv),
+            PieceType::Bishop => self.validate_bishop_standard_move(mv),
+            PieceType::Queen => self.validate_queen_standard_move(mv),
+            PieceType::King => self.validate_king_standard_move(mv),
         }
     }
 
-    fn validate_pawn_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_pawn_standard_move(&self, mv: &StandardMove) -> bool {
         if mv.from.0 == 0 || mv.from.0 == 7 {
             return false;
         }
@@ -251,7 +268,7 @@ impl State {
                 && self.board.is_position_color(&mv.to, &self.opponent))
     }
 
-    fn validate_rook_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_rook_standard_move(&self, mv: &StandardMove) -> bool {
         if mv.from.0 != mv.to.0 && mv.from.1 != mv.to.1 {
             return false;
         }
@@ -278,7 +295,7 @@ impl State {
             .is_position_empty_or_color(&mv.to, &self.opponent)
     }
 
-    fn validate_knight_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_knight_standard_move(&self, mv: &StandardMove) -> bool {
         let rank_diff = mv.from.0.abs_diff(mv.to.0);
         let file_diff = mv.from.1.abs_diff(mv.to.1);
 
@@ -288,7 +305,7 @@ impl State {
                 .is_position_empty_or_color(&mv.to, &self.opponent)
     }
 
-    fn validate_bishop_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_bishop_standard_move(&self, mv: &StandardMove) -> bool {
         let diff_rank = (mv.from.0 - mv.to.0).abs();
         let diff_file = (mv.from.1 - mv.to.1).abs();
 
@@ -314,11 +331,11 @@ impl State {
             .is_position_empty_or_color(&mv.to, &self.opponent)
     }
 
-    fn validate_queen_normal_move(&self, mv: &StandardMove) -> bool {
-        self.validate_rook_normal_move(mv) || self.validate_bishop_normal_move(mv)
+    fn validate_queen_standard_move(&self, mv: &StandardMove) -> bool {
+        self.validate_rook_standard_move(mv) || self.validate_bishop_standard_move(mv)
     }
 
-    fn validate_king_normal_move(&self, mv: &StandardMove) -> bool {
+    fn validate_king_standard_move(&self, mv: &StandardMove) -> bool {
         mv.from.0.abs_diff(mv.to.0) <= 1
             && mv.from.1.abs_diff(mv.to.1) <= 1
             && self
@@ -399,7 +416,7 @@ impl State {
             && self
                 .board
                 .is_position_piece(&mv.pawn.from, &Piece(self.player.clone(), PieceType::Pawn))
-            && self.validate_pawn_normal_move(&mv.pawn)
+            && self.validate_pawn_standard_move(&mv.pawn)
     }
 
     fn validate_castling_move(&self, mv: &CastlingMove) -> bool {
