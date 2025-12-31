@@ -1,260 +1,223 @@
-use super::piece::*;
+use std::ops::*;
 
-#[derive(Clone, PartialEq)]
-pub struct Position(pub i8, pub i8);
+#[repr(u8)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Color {
+    White = 0,
+    Black = 1,
+}
+
+impl Color {
+    pub const fn idx(self) -> usize {
+        self as usize
+    }
+}
+
+#[repr(u8)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum MoveType {
+    Standard = 0,
+    DoublePush = 1,
+    EnPassant = 2,
+    PromotionRook = 3,
+    PromotionKnight = 4,
+    PromotionBishop = 5,
+    PromotionQueen = 6,
+    KingSideCastling = 7,
+    QueenSideCastling = 8,
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct Position(u8);
 
 impl Position {
-    pub fn is_valid(&self) -> bool {
-        (0..8).contains(&self.0) && (0..8).contains(&self.1)
+    pub(super) const fn mask(self) -> BitBoard {
+        BitBoard(1u64 << self.0)
     }
 }
 
-impl std::fmt::Display for Position {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", (self.1 as u8 + b'a') as char, self.0 + 1)
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct Move(u16);
+
+impl Move {
+    pub(super) fn from(self) -> Position {
+        Position(((self.0 >> 10) & 0x3F) as u8)
     }
-}
 
-#[derive(Clone)]
-pub struct Board([[Option<Piece>; 8]; 8]);
+    pub(super) fn to(self) -> Position {
+        Position(((self.0 >> 4) & 0x3F) as u8)
+    }
 
-impl std::fmt::Display for Board {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, row) in self.0.iter().rev().enumerate() {
-            write!(f, "{} | ", 8 - i)?;
-            for piece in row {
-                match piece {
-                    Some(p) => write!(f, "{} ", p)?,
-                    None => write!(f, ". ")?,
-                }
-            }
-            writeln!(f)?;
+    pub(super) fn move_type(self) -> MoveType {
+        match self.0 & 0x000F {
+            1 => MoveType::DoublePush,
+            2 => MoveType::EnPassant,
+            3 => MoveType::PromotionRook,
+            4 => MoveType::PromotionKnight,
+            5 => MoveType::PromotionBishop,
+            6 => MoveType::PromotionQueen,
+            7 => MoveType::KingSideCastling,
+            8 => MoveType::QueenSideCastling,
+            _ => MoveType::Standard,
         }
-        writeln!(f, "   ----------------")?;
-        writeln!(f, "    a b c d e f g h")?;
-        Ok(())
     }
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct BitBoard(u64);
+
+const EMPTY_BIT_BOARD: BitBoard = BitBoard(0);
+
+impl BitOr for BitBoard {
+    type Output = Self;
+    fn bitor(self, rhs: Self) -> Self {
+        BitBoard(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+impl BitAnd for BitBoard {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        BitBoard(self.0 & rhs.0)
+    }
+}
+
+impl BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0 &= rhs.0;
+    }
+}
+
+impl BitXor for BitBoard {
+    type Output = Self;
+    fn bitxor(self, rhs: Self) -> Self {
+        BitBoard(self.0 ^ rhs.0)
+    }
+}
+
+impl BitXorAssign for BitBoard {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        self.0 ^= rhs.0;
+    }
+}
+
+impl Not for BitBoard {
+    type Output = Self;
+    fn not(self) -> Self {
+        BitBoard(!self.0)
+    }
+}
+
+impl Shl<u32> for BitBoard {
+    type Output = Self;
+    fn shl(self, rhs: u32) -> Self {
+        BitBoard(self.0 << rhs)
+    }
+}
+
+impl ShlAssign<u32> for BitBoard {
+    fn shl_assign(&mut self, rhs: u32) {
+        self.0 <<= rhs;
+    }
+}
+
+impl Shr<u32> for BitBoard {
+    type Output = Self;
+    fn shr(self, rhs: u32) -> Self {
+        BitBoard(self.0 >> rhs)
+    }
+}
+
+impl ShrAssign<u32> for BitBoard {
+    fn shr_assign(&mut self, rhs: u32) {
+        self.0 >>= rhs;
+    }
+}
+
+pub struct PieceBoards([BitBoard; 2]);
+
+impl Index<Color> for PieceBoards {
+    type Output = BitBoard;
+
+    fn index(&self, index: Color) -> &Self::Output {
+        &self.0[index.idx()]
+    }
+}
+
+impl IndexMut<Color> for PieceBoards {
+    fn index_mut(&mut self, index: Color) -> &mut Self::Output {
+        &mut self.0[index.idx()]
+    }
+}
+
+pub struct Board {
+    pawns: PieceBoards,
+    rooks: PieceBoards,
+    knights: PieceBoards,
+    bishops: PieceBoards,
+    queens: PieceBoards,
+    kings: PieceBoards,
 }
 
 impl Board {
-    pub fn new() -> Board {
-        const INITIAL_BOARD: [[Option<Piece>; 8]; 8] = [
-            [
-                Some(Piece(Color::White, PieceType::Rook)),
-                Some(Piece(Color::White, PieceType::Knight)),
-                Some(Piece(Color::White, PieceType::Bishop)),
-                Some(Piece(Color::White, PieceType::Queen)),
-                Some(Piece(Color::White, PieceType::King)),
-                Some(Piece(Color::White, PieceType::Bishop)),
-                Some(Piece(Color::White, PieceType::Knight)),
-                Some(Piece(Color::White, PieceType::Rook)),
-            ],
-            [
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-                Some(Piece(Color::White, PieceType::Pawn)),
-            ],
-            [None, None, None, None, None, None, None, None],
-            [None, None, None, None, None, None, None, None],
-            [None, None, None, None, None, None, None, None],
-            [None, None, None, None, None, None, None, None],
-            [
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-                Some(Piece(Color::Black, PieceType::Pawn)),
-            ],
-            [
-                Some(Piece(Color::Black, PieceType::Rook)),
-                Some(Piece(Color::Black, PieceType::Knight)),
-                Some(Piece(Color::Black, PieceType::Bishop)),
-                Some(Piece(Color::Black, PieceType::Queen)),
-                Some(Piece(Color::Black, PieceType::King)),
-                Some(Piece(Color::Black, PieceType::Bishop)),
-                Some(Piece(Color::Black, PieceType::Knight)),
-                Some(Piece(Color::Black, PieceType::Rook)),
-            ],
-        ];
-        Board(INITIAL_BOARD)
-    }
-
-    pub fn get_piece(&self, &Position(x, y): &Position) -> &Option<Piece> {
-        self.0
-            .get(x as usize)
-            .and_then(|row| row.get(y as usize))
-            .unwrap_or(&None)
-    }
-
-    pub fn set_piece(&mut self, &Position(x, y): &Position, piece: Option<Piece>) {
-        if let Some(cell) = self
-            .0
-            .get_mut(x as usize)
-            .and_then(|row| row.get_mut(y as usize))
-        {
-            *cell = piece;
+    pub(super) fn new() -> Self {
+        Self {
+            pawns: PieceBoards([BitBoard(0x000000000000FF00), BitBoard(0x00FF000000000000)]),
+            rooks: PieceBoards([BitBoard(0x0000000000000081), BitBoard(0x8100000000000000)]),
+            knights: PieceBoards([BitBoard(0x0000000000000042), BitBoard(0x4200000000000000)]),
+            bishops: PieceBoards([BitBoard(0x0000000000000024), BitBoard(0x2400000000000000)]),
+            queens: PieceBoards([BitBoard(0x0000000000000008), BitBoard(0x0800000000000000)]),
+            kings: PieceBoards([BitBoard(0x0000000000000010), BitBoard(0x1000000000000000)]),
         }
     }
 
-    pub fn for_each<F>(&self, mut f: F)
-    where
-        F: FnMut(&Position, &Option<Piece>),
-    {
-        for (x, row) in self.0.iter().enumerate() {
-            for (y, piece) in row.iter().enumerate() {
-                f(&Position(x as i8, y as i8), piece)
-            }
+    fn get_occupied(&self, color: Color) -> BitBoard {
+        self.pawns[color]
+            | self.rooks[color]
+            | self.knights[color]
+            | self.bishops[color]
+            | self.queens[color]
+            | self.kings[color]
+    }
+
+    fn find_pieces(&self, mask: BitBoard) -> BitBoard {
+        if self.pawns[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.pawns[Color::White]
+        } else if self.pawns[Color::Black] & mask != EMPTY_BIT_BOARD {
+            self.pawns[Color::Black]
+        } else if self.rooks[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.rooks[Color::White]
+        } else if self.rooks[Color::Black] & mask != EMPTY_BIT_BOARD {
+            self.rooks[Color::Black]
+        } else if self.knights[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.knights[Color::White]
+        } else if self.knights[Color::Black] & mask != EMPTY_BIT_BOARD {
+            self.knights[Color::Black]
+        } else if self.bishops[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.bishops[Color::White]
+        } else if self.bishops[Color::Black] & mask != EMPTY_BIT_BOARD {
+            self.bishops[Color::Black]
+        } else if self.queens[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.queens[Color::White]
+        } else if self.queens[Color::Black] & mask != EMPTY_BIT_BOARD {
+            self.queens[Color::Black]
+        } else if self.kings[Color::White] & mask != EMPTY_BIT_BOARD {
+            self.kings[Color::White]
+        } else {
+            self.kings[Color::Black]
         }
     }
 
-    pub fn is_position_empty(&self, position: &Position) -> bool {
-        position.is_valid() && self.get_piece(position).is_none()
-    }
-
-    pub fn is_position_piece(&self, position: &Position, piece: &Piece) -> bool {
-        self.get_piece(position)
-            .as_ref()
-            .map_or(false, |got| got == piece)
-    }
-
-    pub fn is_position_piece_type(&self, position: &Position, piece_type: &PieceType) -> bool {
-        self.get_piece(position)
-            .as_ref()
-            .map_or(false, |piece| piece.1 == *piece_type)
-    }
-
-    pub fn is_position_color(&self, position: &Position, color: &Color) -> bool {
-        self.get_piece(position)
-            .as_ref()
-            .map_or(false, |piece| piece.0 == *color)
-    }
-
-    pub fn is_position_empty_or_color(&self, position: &Position, color: &Color) -> bool {
-        self.is_position_empty(position) || self.is_position_color(position, color)
-    }
-
-    pub fn is_position_in_check(&self, position: &Position, opponent: &Color) -> bool {
-        position.is_valid()
-            && (self.is_position_in_check_by_pawn(position, opponent)
-                || self.is_position_in_check_by_rook_or_queen(position, opponent)
-                || self.is_position_in_check_by_knight(position, opponent)
-                || self.is_position_in_check_by_bishop_or_queen(position, opponent)
-                || self.is_position_in_check_by_king(position, opponent))
-    }
-
-    fn is_position_in_check_by_pawn(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
-        let rank = match opponent {
-            Color::White => x - 1,
-            Color::Black => x + 1,
-        };
-
-        let positions = [Position(rank, y - 1), Position(rank, y + 1)];
-
-        positions.iter().any(|pos| {
-            matches!(
-                self.get_piece(pos),
-                Some(Piece(color, PieceType::Pawn)) if *color == *opponent,
-            )
-        })
-    }
-
-    fn is_position_in_check_by_rook_or_queen(
-        &self,
-        &Position(x, y): &Position,
-        opponent: &Color,
-    ) -> bool {
-        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            for i in 1..8 {
-                let pos = Position(x + i * dx, y + i * dy);
-                if !pos.is_valid() {
-                    break;
-                }
-
-                match self.get_piece(&pos) {
-                    None => continue,
-                    Some(Piece(color, PieceType::Rook | PieceType::Queen)) if color == opponent => {
-                        return true
-                    }
-                    _ => break,
-                }
-            }
-        }
-
-        false
-    }
-
-    fn is_position_in_check_by_knight(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
-        let positions = [
-            Position(x + 1, y - 2),
-            Position(x + 2, y - 1),
-            Position(x + 2, y + 1),
-            Position(x + 1, y + 2),
-            Position(x - 1, y + 2),
-            Position(x - 2, y + 1),
-            Position(x - 2, y - 1),
-            Position(x - 1, y - 2),
-        ];
-
-        positions.iter().any(|pos| {
-            matches!(
-                self.get_piece(pos),
-                Some(Piece(color, PieceType::Knight)) if *color == *opponent,
-            )
-        })
-    }
-
-    fn is_position_in_check_by_bishop_or_queen(
-        &self,
-        &Position(x, y): &Position,
-        opponent: &Color,
-    ) -> bool {
-        for (dx, dy) in [(1, 1), (1, -1), (-1, 1), (-1, -1)] {
-            for i in 1..8 {
-                let pos = Position(x + i * dx, y + i * dy);
-                if !pos.is_valid() {
-                    break;
-                }
-
-                match self.get_piece(&pos) {
-                    None => continue,
-                    Some(Piece(color, PieceType::Bishop | PieceType::Queen))
-                        if color == opponent =>
-                    {
-                        return true
-                    }
-                    _ => break,
-                }
-            }
-        }
-
-        false
-    }
-
-    fn is_position_in_check_by_king(&self, &Position(x, y): &Position, opponent: &Color) -> bool {
-        let positions = [
-            Position(x - 1, y - 1),
-            Position(x - 1, y),
-            Position(x - 1, y + 1),
-            Position(x + 1, y - 1),
-            Position(x + 1, y),
-            Position(x + 1, y + 1),
-            Position(x, y - 1),
-            Position(x, y + 1),
-        ];
-
-        positions.iter().any(|pos| {
-            matches!(
-                self.get_piece(pos),
-                Some(Piece(color, PieceType::King)) if *color == *opponent,
-            )
-        })
+    fn move_piece(&mut self, from: Position, to: Position) {
+        let pieces = self.find_pieces(from.mask());
     }
 }
