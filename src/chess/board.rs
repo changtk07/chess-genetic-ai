@@ -14,10 +14,7 @@ impl Color {
 
     #[inline]
     pub(super) fn flip(self) -> Self {
-        match self {
-            Color::White => Color::Black,
-            Color::Black => Color::White,
-        }
+        unsafe { std::mem::transmute(1 - (self as u8)) }
     }
 }
 
@@ -36,6 +33,38 @@ pub(super) enum Piece {
     BlackBishop = 9,
     BlackQueen = 10,
     BlackKing = 11,
+}
+
+impl Piece {
+    #[inline]
+    pub(super) const fn pawn(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6) }
+    }
+
+    #[inline]
+    pub(super) const fn rook(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6 + 1) }
+    }
+
+    #[inline]
+    pub(super) const fn knight(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6 + 2) }
+    }
+
+    #[inline]
+    pub(super) const fn bishop(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6 + 3) }
+    }
+
+    #[inline]
+    pub(super) const fn queen(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6 + 4) }
+    }
+
+    #[inline]
+    pub(super) const fn king(color: Color) -> Self {
+        unsafe { std::mem::transmute((color as u8) * 6 + 5) }
+    }
 }
 
 #[repr(u8)]
@@ -68,6 +97,10 @@ impl Position {
 
     pub(super) const fn middle_of(a: Self, b: Self) -> Self {
         Position((a.0 + b.0) / 2)
+    }
+
+    pub(super) const fn en_passant_captured(from: Self, to: Self) -> Self {
+        Position(((from.0 >> 3) << 3) + (to.0 & 0b111)) // = (from/8)*8 + (to%8)
     }
 
     #[inline]
@@ -337,20 +370,18 @@ impl Board {
     pub(super) fn new() -> Self {
         Self {
             pieces: [
-                // White pieces
-                BitBoard(0x000000000000FF00), // Pawns
-                BitBoard(0x0000000000000081), // Rooks
-                BitBoard(0x0000000000000042), // Knights
-                BitBoard(0x0000000000000024), // Bishops
-                BitBoard(0x0000000000000008), // Queens
-                BitBoard(0x0000000000000010), // Kings
-                // Black pieces
-                BitBoard(0x00FF000000000000), // Pawns
-                BitBoard(0x8100000000000000), // Rooks
-                BitBoard(0x4200000000000000), // Knights
-                BitBoard(0x2400000000000000), // Bishops
-                BitBoard(0x0800000000000000), // Queens
-                BitBoard(0x1000000000000000), // Kings
+                BitBoard(0x000000000000FF00), // White Pawns
+                BitBoard(0x0000000000000081), // White Rooks
+                BitBoard(0x0000000000000042), // White Knights
+                BitBoard(0x0000000000000024), // White Bishops
+                BitBoard(0x0000000000000008), // White Queens
+                BitBoard(0x0000000000000010), // White Kings
+                BitBoard(0x00FF000000000000), // Black Pawns
+                BitBoard(0x8100000000000000), // Black Rooks
+                BitBoard(0x4200000000000000), // Black Knights
+                BitBoard(0x2400000000000000), // Black Bishops
+                BitBoard(0x0800000000000000), // Black Queens
+                BitBoard(0x1000000000000000), // Black Kings
             ],
             mailbox: Mailbox::new(),
         }
