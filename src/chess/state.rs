@@ -2,6 +2,7 @@ use super::board::*;
 
 #[derive(Clone)]
 struct History {
+    mv: Move,
     captured: Option<Piece>,
     en_passant: Option<Position>,
     castling_rights: CastlingRights,
@@ -43,6 +44,7 @@ impl State {
         let (moved, captured) = self.board.move_piece(from, to);
 
         self.history.push(History {
+            mv,
             captured,
             en_passant: self.en_passant,
             castling_rights: self.castling_rights,
@@ -66,16 +68,7 @@ impl State {
         self.turn = self.turn.flip();
     }
 
-    pub fn unmake_move(&mut self, mv: Move) {
-        let from = mv.from();
-        let to = mv.to();
-        let move_type = mv.move_type();
-
-        self.turn = self.turn.flip();
-        self.fullmove_number -= self.turn as usize;
-
-        self.board.move_piece(to, from);
-
+    pub fn unmake_move(&mut self) {
         let Some(history) = self.history.pop() else {
             return;
         };
@@ -83,6 +76,14 @@ impl State {
         self.en_passant = history.en_passant;
         self.castling_rights = history.castling_rights;
         self.halfmove_clock = history.halfmove_clock;
+        self.turn = self.turn.flip();
+        self.fullmove_number -= self.turn as usize;
+
+        let from = history.mv.from();
+        let to = history.mv.to();
+        let move_type = history.mv.move_type();
+
+        self.board.move_piece(to, from);
 
         if let Some(captured) = history.captured {
             self.board.set_piece(to, captured);
@@ -182,5 +183,15 @@ impl State {
         } else {
             self.halfmove_clock += 1;
         }
+    }
+
+    // ------------------------------------------------------------------------
+    // Move Generation
+    // ------------------------------------------------------------------------
+
+    fn generate_legal_moves(&self) -> Vec<Move> {
+        // TODO
+        let moves = vec![];
+        moves
     }
 }
