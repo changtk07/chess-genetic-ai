@@ -176,6 +176,119 @@ struct BitBoard(u64);
 impl BitBoard {
     const EMPTY: BitBoard = BitBoard(0);
 
+    const KING_ATTACK_MASKS: [BitBoard; 64] = {
+        let mut masks = [Self::EMPTY; 64];
+        let mut i = 0;
+        while i < 64 {
+            let mut mask = 0u64;
+            let (rank, file) = (i / 8, i % 8);
+            if rank > 0 {
+                mask |= 1u64 << (i - 8);
+                mask |= if file > 0 { 1u64 << (i - 9) } else { 0 };
+                mask |= if file < 7 { 1u64 << (i - 7) } else { 0 };
+            }
+            if rank < 7 {
+                mask |= 1u64 << (i + 8);
+                mask |= if file > 0 { 1u64 << (i + 7) } else { 0 };
+                mask |= if file < 7 { 1u64 << (i + 9) } else { 0 };
+            }
+            mask |= if file > 0 { 1u64 << (i - 1) } else { 0 };
+            mask |= if file < 7 { 1u64 << (i + 1) } else { 0 };
+            masks[i] = BitBoard(mask);
+            i += 1;
+        }
+        masks
+    };
+
+    const KNIGHT_ATTACK_MASKS: [BitBoard; 64] = {
+        let mut masks = [Self::EMPTY; 64];
+        let mut i = 0;
+        while i < 64 {
+            let mut mask = 0u64;
+            let (rank, file) = (i / 8, i % 8);
+            if rank < 6 {
+                mask |= if file < 7 { 1u64 << (i + 17) } else { 0 };
+                mask |= if file > 0 { 1u64 << (i + 15) } else { 0 };
+            }
+            if rank < 7 {
+                mask |= if file < 6 { 1u64 << (i + 10) } else { 0 };
+                mask |= if file > 1 { 1u64 << (i + 6) } else { 0 };
+            }
+            if rank > 0 {
+                mask |= if file < 6 { 1u64 << (i - 6) } else { 0 };
+                mask |= if file > 1 { 1u64 << (i - 10) } else { 0 };
+            }
+            if rank > 1 {
+                mask |= if file < 7 { 1u64 << (i - 15) } else { 0 };
+                mask |= if file > 0 { 1u64 << (i - 17) } else { 0 };
+            }
+            masks[i] = BitBoard(mask);
+            i += 1;
+        }
+        masks
+    };
+
+    const WHITE_PAWN_ATTACK_MASKS: [BitBoard; 64] = {
+        let mut masks = [Self::EMPTY; 64];
+        let mut i = 0;
+        while i < 56 {
+            let mut mask = 0u64;
+            let (rank, file) = (i / 8, i % 8);
+            mask |= if file < 7 { 1u64 << (i + 9) } else { 0 };
+            mask |= if file > 0 { 1u64 << (i + 7) } else { 0 };
+            masks[i] = BitBoard(mask);
+            i += 1;
+        }
+        masks
+    };
+
+    const BLACK_PAWN_ATTACK_MASKS: [BitBoard; 64] = {
+        let mut masks = [Self::EMPTY; 64];
+        let mut i = 63;
+        while i > 7 {
+            let mut mask = 0u64;
+            let (rank, file) = (i / 8, i % 8);
+            mask |= if file < 7 { 1u64 << (i - 7) } else { 0 };
+            mask |= if file > 0 { 1u64 << (i - 9) } else { 0 };
+            masks[i] = BitBoard(mask);
+            i -= 1;
+        }
+        masks
+    };
+
+    const RAYS: [[BitBoard; 64]; 8] = {
+        const fn generate_ray(df: i8, dr: i8) -> [BitBoard; 64] {
+            let mut masks = [BitBoard(0); 64];
+            let mut i = 0;
+            while i < 64 {
+                let mut mask = 0u64;
+                let (mut rank, mut file) = ((i / 8) as i8, (i % 8) as i8);
+                loop {
+                    file += df;
+                    rank += dr;
+                    if file < 0 || file > 7 || rank < 0 || rank > 7 {
+                        break;
+                    }
+                    mask |= 1u64 << (rank * 8 + file);
+                }
+                masks[i] = BitBoard(mask);
+                i += 1;
+            }
+            masks
+        }
+
+        [
+            generate_ray(0, 1),   // North
+            generate_ray(0, -1),  // South
+            generate_ray(1, 0),   // East
+            generate_ray(-1, 0),  // West
+            generate_ray(1, 1),   // North East
+            generate_ray(-1, 1),  // South East
+            generate_ray(1, -1),  // North West
+            generate_ray(-1, -1), // South West
+        ]
+    };
+
     #[inline]
     fn is_empty(self, position: Position) -> bool {
         self & position.mask() == Self::EMPTY
@@ -189,6 +302,106 @@ impl BitBoard {
     #[inline]
     fn unset(self, position: Position) -> BitBoard {
         self & !position.mask()
+    }
+
+    #[inline]
+    fn lsb(self) -> Position {
+        debug_assert!(self.0 != 0, "Called lsb() on an empty BitBoard");
+        Position(self.0.trailing_zeros() as u8)
+    }
+
+    #[inline]
+    fn msb(self) -> Position {
+        debug_assert!(self.0 != 0, "Called msb() on an empty BitBoard");
+        Position(63 - self.0.leading_zeros() as u8)
+    }
+
+    fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+        let mut mask = BitBoard::EMPTY;
+
+        // North (Index 0) - Positive direction, blocker is LSB
+        let north = Self::RAYS[0][position.0 as usize];
+        let north_blockers = north & occupancy;
+        mask |= if north_blockers.0 != 0 {
+            north ^ Self::RAYS[0][north_blockers.lsb().0 as usize]
+        } else {
+            north
+        };
+
+        // South (Index 1) - Negative direction, blocker is MSB
+        let south = Self::RAYS[1][position.0 as usize];
+        let south_blockers = south & occupancy;
+        mask |= if south_blockers.0 != 0 {
+            south ^ Self::RAYS[1][south_blockers.msb().0 as usize]
+        } else {
+            south
+        };
+
+        // East (Index 2) - Positive direction, blocker is LSB
+        let east = Self::RAYS[2][position.0 as usize];
+        let east_blockers = east & occupancy;
+        mask |= if east_blockers.0 != 0 {
+            east ^ Self::RAYS[2][east_blockers.lsb().0 as usize]
+        } else {
+            east
+        };
+
+        // West (Index 3) - Negative direction, blocker is MSB
+        let west = Self::RAYS[3][position.0 as usize];
+        let west_blockers = west & occupancy;
+        mask |= if west_blockers.0 != 0 {
+            west ^ Self::RAYS[3][west_blockers.msb().0 as usize]
+        } else {
+            west
+        };
+
+        mask
+    }
+
+    fn bishop_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+        let mut mask = BitBoard::EMPTY;
+
+        // North East (Index 4) - Positive direction, blocker is LSB
+        let north_east = Self::RAYS[4][position.0 as usize];
+        let north_east_blockers = north_east & occupancy;
+        mask |= if north_east_blockers.0 != 0 {
+            north_east ^ Self::RAYS[4][north_east_blockers.lsb().0 as usize]
+        } else {
+            north_east
+        };
+
+        // South East (Index 5) - Negative direction, blocker is MSB
+        let south_east = Self::RAYS[5][position.0 as usize];
+        let south_east_blockers = south_east & occupancy;
+        mask |= if south_east_blockers.0 != 0 {
+            south_east ^ Self::RAYS[5][south_east_blockers.msb().0 as usize]
+        } else {
+            south_east
+        };
+
+        // North West (Index 6) - Positive direction, blocker is LSB
+        let north_west = Self::RAYS[6][position.0 as usize];
+        let north_west_blockers = north_west & occupancy;
+        mask |= if north_west_blockers.0 != 0 {
+            north_west ^ Self::RAYS[6][north_west_blockers.lsb().0 as usize]
+        } else {
+            north_west
+        };
+
+        // South West (Index 7) - Negative direction, blocker is MSB
+        let south_west = Self::RAYS[7][position.0 as usize];
+        let south_west_blockers = south_west & occupancy;
+        mask |= if south_west_blockers.0 != 0 {
+            south_west ^ Self::RAYS[7][south_west_blockers.msb().0 as usize]
+        } else {
+            south_west
+        };
+
+        mask
+    }
+
+    fn queen_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+        Self::rook_attack_mask(position, occupancy) | Self::bishop_attack_mask(position, occupancy)
     }
 }
 
