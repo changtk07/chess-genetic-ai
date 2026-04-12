@@ -65,6 +65,15 @@ impl Piece {
     pub(super) const fn king(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 5) }
     }
+
+    #[inline]
+    pub(super) const fn color(self) -> Color {
+        if (self as u8) < 6 {
+            Color::White
+        } else {
+            Color::Black
+        }
+    }
 }
 
 #[repr(u8)]
@@ -571,6 +580,21 @@ impl Index<Position> for Mailbox {
 impl IndexMut<Position> for Mailbox {
     fn index_mut(&mut self, index: Position) -> &mut Self::Output {
         &mut self.0[index.0 as usize]
+    }
+}
+
+impl Index<Color> for [BitBoard; 2] {
+    type Output = BitBoard;
+    #[inline]
+    fn index(&self, index: Color) -> &Self::Output {
+        &self[index as usize]
+    }
+}
+
+impl IndexMut<Color> for [BitBoard; 2] {
+    #[inline]
+    fn index_mut(&mut self, index: Color) -> &mut Self::Output {
+        &mut self[index as usize]
     }
 }
 
