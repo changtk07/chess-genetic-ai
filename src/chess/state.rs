@@ -194,4 +194,50 @@ impl State {
         let moves = vec![];
         moves
     }
+
+    fn generate_pawn_moves(&self, position: Position, moves: &mut Vec<Move>) {
+        self.generate_pawn_push_moves(position, moves);
+        // TODO: attack
+    }
+
+    fn generate_pawn_push_moves(&self, position: Position, moves: &mut Vec<Move>) {
+        let (forward_delta, start_rank_mask, end_rank_mask) = match self.turn {
+            Color::White => (8i8, BitBoard::RANK_2, BitBoard::RANK_8),
+            Color::Black => (-8i8, BitBoard::RANK_7, BitBoard::RANK_1),
+        };
+
+        let single_push_position = position.offset_unchecked(forward_delta);
+
+        if self.board.is_occupied(single_push_position) {
+            return;
+        }
+
+        if end_rank_mask.is_not_empty(single_push_position) {
+            moves.extend([
+                Move::new(position, single_push_position, MoveType::PromotionQueen),
+                Move::new(position, single_push_position, MoveType::PromotionRook),
+                Move::new(position, single_push_position, MoveType::PromotionBishop),
+                Move::new(position, single_push_position, MoveType::PromotionKnight),
+            ]);
+            return;
+        }
+
+        moves.push(Move::new(
+            position,
+            single_push_position,
+            MoveType::Standard,
+        ));
+
+        if start_rank_mask.is_not_empty(position) {
+            let double_push_position = single_push_position.offset_unchecked(forward_delta);
+
+            if self.board.is_not_occupied(double_push_position) {
+                moves.push(Move::new(
+                    position,
+                    double_push_position,
+                    MoveType::DoublePush,
+                ));
+            }
+        }
+    }
 }
