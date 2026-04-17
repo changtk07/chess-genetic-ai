@@ -2,7 +2,7 @@ use std::ops::*;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) enum Color {
+pub enum Color {
     White = 0,
     Black = 1,
 }
@@ -13,14 +13,14 @@ impl Color {
     }
 
     #[inline]
-    pub(super) fn flip(self) -> Self {
+    pub fn flip(self) -> Self {
         unsafe { std::mem::transmute(1 - (self as u8)) }
     }
 }
 
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) enum Piece {
+pub enum Piece {
     WhitePawn = 0,
     WhiteRook = 1,
     WhiteKnight = 2,
@@ -37,37 +37,37 @@ pub(super) enum Piece {
 
 impl Piece {
     #[inline]
-    pub(super) const fn pawn(color: Color) -> Self {
+    pub const fn pawn(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6) }
     }
 
     #[inline]
-    pub(super) const fn rook(color: Color) -> Self {
+    pub const fn rook(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 1) }
     }
 
     #[inline]
-    pub(super) const fn knight(color: Color) -> Self {
+    pub const fn knight(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 2) }
     }
 
     #[inline]
-    pub(super) const fn bishop(color: Color) -> Self {
+    pub const fn bishop(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 3) }
     }
 
     #[inline]
-    pub(super) const fn queen(color: Color) -> Self {
+    pub const fn queen(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 4) }
     }
 
     #[inline]
-    pub(super) const fn king(color: Color) -> Self {
+    pub const fn king(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6 + 5) }
     }
 
     #[inline]
-    pub(super) const fn color(self) -> Color {
+    pub const fn color(self) -> Color {
         if (self as u8) < 6 {
             Color::White
         } else {
@@ -78,7 +78,7 @@ impl Piece {
 
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) enum MoveType {
+pub enum MoveType {
     Standard,
     DoublePush,
     EnPassant,
@@ -92,35 +92,40 @@ pub(super) enum MoveType {
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) struct Position(pub(super) u8);
+pub struct Position(pub u8);
 
 impl Position {
-    pub(super) const H1: Self = Position(7);
-    pub(super) const A1: Self = Position(0);
-    pub(super) const H8: Self = Position(63);
-    pub(super) const A8: Self = Position(56);
-    pub(super) const F1: Self = Position(5);
-    pub(super) const D1: Self = Position(3);
-    pub(super) const F8: Self = Position(61);
-    pub(super) const D8: Self = Position(59);
+    pub const H1: Self = Position(7);
+    pub const A1: Self = Position(0);
+    pub const H8: Self = Position(63);
+    pub const A8: Self = Position(56);
+    pub const F1: Self = Position(5);
+    pub const D1: Self = Position(3);
+    pub const F8: Self = Position(61);
+    pub const D8: Self = Position(59);
 
-    pub(super) const fn middle_of(a: Self, b: Self) -> Self {
+    pub const fn middle_of(a: Self, b: Self) -> Self {
         Position((a.0 + b.0) / 2)
     }
 
-    pub(super) const fn en_passant_captured(from: Self, to: Self) -> Self {
+    pub const fn en_passant_captured(from: Self, to: Self) -> Self {
         Position(((from.0 >> 3) << 3) + (to.0 & 0b111)) // = (from/8)*8 + (to%8)
     }
 
     #[inline]
-    const fn mask(self) -> BitBoard {
+    pub const fn mask(self) -> BitBoard {
         BitBoard(1u64 << self.0)
+    }
+
+    #[inline]
+    pub const fn offset_unchecked(self, delta: i8) -> Position {
+        Position((self.0 as i8 + delta) as u8)
     }
 }
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-pub(super) struct CastlingRights(u8);
+pub struct CastlingRights(u8);
 
 impl CastlingRights {
     const MASKS: [u8; 64] = [
@@ -134,12 +139,12 @@ impl CastlingRights {
         14, 15, 15, 15, 12, 15, 15, 13, // 56-63
     ];
 
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self(0b1111)
     }
 
     #[inline]
-    pub(super) fn update(&mut self, from: Position, to: Position) {
+    pub fn update(&mut self, from: Position, to: Position) {
         self.0 &= Self::MASKS[from.0 as usize] & Self::MASKS[to.0 as usize];
     }
 }
@@ -165,25 +170,37 @@ impl MoveType {
 pub struct Move(u16);
 
 impl Move {
-    pub(super) fn from(self) -> Position {
+    pub fn new(from: Position, to: Position, move_type: MoveType) -> Self {
+        let mut mv = 0u16;
+        mv |= (from.0 as u16 & 0x3F) << 10;
+        mv |= (to.0 as u16 & 0x3F) << 4;
+        mv |= (move_type as u16) & 0x0F;
+        Move(mv)
+    }
+
+    pub fn from(self) -> Position {
         Position(((self.0 >> 10) & 0x3F) as u8)
     }
 
-    pub(super) fn to(self) -> Position {
+    pub fn to(self) -> Position {
         Position(((self.0 >> 4) & 0x3F) as u8)
     }
 
-    pub(super) fn move_type(self) -> MoveType {
-        MoveType::new(self.0 & 0x000F)
+    pub fn move_type(self) -> MoveType {
+        MoveType::new(self.0 & 0x0F)
     }
 }
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
-struct BitBoard(u64);
+pub struct BitBoard(u64);
 
 impl BitBoard {
-    const EMPTY: BitBoard = BitBoard(0);
+    pub const EMPTY: BitBoard = BitBoard(0);
+    pub const RANK_1: BitBoard = BitBoard(0x00000000000000FF);
+    pub const RANK_2: BitBoard = BitBoard(0x000000000000FF00);
+    pub const RANK_7: BitBoard = BitBoard(0x00FF000000000000);
+    pub const RANK_8: BitBoard = BitBoard(0xFF00000000000000);
 
     const KING_ATTACK_MASKS: [BitBoard; 64] = {
         let mut masks = [Self::EMPTY; 64];
@@ -299,8 +316,13 @@ impl BitBoard {
     };
 
     #[inline]
-    fn is_empty(self, position: Position) -> bool {
+    pub fn is_empty(self, position: Position) -> bool {
         self & position.mask() == Self::EMPTY
+    }
+
+    #[inline]
+    pub fn is_not_empty(self, position: Position) -> bool {
+        self & position.mask() != Self::EMPTY
     }
 
     #[inline]
@@ -598,13 +620,15 @@ impl IndexMut<Color> for [BitBoard; 2] {
     }
 }
 
-pub(super) struct Board {
+pub struct Board {
     pieces: [BitBoard; 12],
+    colors: [BitBoard; 2],
+    occupancy: BitBoard,
     mailbox: Mailbox,
 }
 
 impl Board {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             pieces: [
                 BitBoard(0x000000000000FF00), // White Pawns
@@ -621,31 +645,44 @@ impl Board {
                 BitBoard(0x1000000000000000), // Black Kings
             ],
             mailbox: Mailbox::new(),
+            colors: [BitBoard(0x000000000000FFFF), BitBoard(0xFFFF000000000000)],
+            occupancy: BitBoard(0xFFFF00000000FFFF),
         }
     }
 
-    pub(super) fn set_piece(&mut self, position: Position, piece: Piece) {
+    pub fn set_piece(&mut self, position: Position, piece: Piece) {
         if let Some(idx) = self.mailbox[position] {
             self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
         }
         self.pieces[piece as usize] = self.pieces[piece as usize].set(position);
         self.mailbox[position] = Some(piece);
+        self.occupancy = self.occupancy.set(position);
+        self.colors[piece.color()] = self.colors[piece.color()].set(position);
     }
 
-    pub(super) fn unset_piece(&mut self, position: Position) {
+    pub fn unset_piece(&mut self, position: Position) {
         let Some(idx) = self.mailbox[position] else {
             return;
         };
-
         self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
         self.mailbox[position] = None;
+        self.occupancy = self.occupancy.unset(position);
+        self.colors[idx.color()] = self.colors[idx.color()].unset(position);
     }
 
-    pub(super) fn move_piece(
-        &mut self,
-        from: Position,
-        to: Position,
-    ) -> (Option<Piece>, Option<Piece>) {
+    pub fn get_color(&self, position: Position) -> Option<Color> {
+        self.mailbox[position].map(|p| p.color())
+    }
+
+    pub fn is_occupied(&self, position: Position) -> bool {
+        self.occupancy.is_not_empty(position)
+    }
+
+    pub fn is_not_occupied(&self, position: Position) -> bool {
+        self.occupancy.is_empty(position)
+    }
+
+    pub fn move_piece(&mut self, from: Position, to: Position) -> (Option<Piece>, Option<Piece>) {
         let Some(from_idx) = self.mailbox[from] else {
             return (None, None);
         };
@@ -655,11 +692,14 @@ impl Board {
         let captured = self.mailbox[to];
         if let Some(to_idx) = captured {
             self.pieces[to_idx as usize] = self.pieces[to_idx as usize].unset(to);
+            self.colors[to_idx.color()] = self.colors[to_idx.color()].unset(to);
         }
 
         self.pieces[from_idx as usize] = next_from_board;
         self.mailbox[to] = Some(from_idx);
         self.mailbox[from] = None;
+        self.colors[from_idx.color()] = self.colors[from_idx.color()].unset(from).set(to);
+        self.occupancy = self.occupancy.unset(from).set(to);
         (Some(from_idx), captured)
     }
 }
