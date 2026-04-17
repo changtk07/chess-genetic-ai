@@ -202,8 +202,8 @@ impl State {
 
     fn generate_pawn_push_moves(&self, position: Position, moves: &mut Vec<Move>) {
         let (forward_delta, start_rank_mask, end_rank_mask) = match self.turn {
-            Color::White => (8i8, BitBoard::RANK_2, BitBoard::RANK_8),
-            Color::Black => (-8i8, BitBoard::RANK_7, BitBoard::RANK_1),
+            Color::White => (8i8, BitBoard::RANK_MASKS[1], BitBoard::RANK_MASKS[7]),
+            Color::Black => (-8i8, BitBoard::RANK_MASKS[6], BitBoard::RANK_MASKS[0]),
         };
 
         let single_push_position = position.offset_unchecked(forward_delta);

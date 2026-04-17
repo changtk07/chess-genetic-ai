@@ -8,13 +8,24 @@ pub enum Color {
 }
 
 impl Color {
-    const fn idx(self) -> usize {
-        self as usize
-    }
-
     #[inline]
     pub fn flip(self) -> Self {
         unsafe { std::mem::transmute(1 - (self as u8)) }
+    }
+}
+
+impl<T> Index<Color> for [T; 2] {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: Color) -> &Self::Output {
+        &self[index as usize]
+    }
+}
+
+impl<T> IndexMut<Color> for [T; 2] {
+    #[inline]
+    fn index_mut(&mut self, index: Color) -> &mut Self::Output {
+        &mut self[index as usize]
     }
 }
 
@@ -76,6 +87,21 @@ impl Piece {
     }
 }
 
+impl<T> Index<Piece> for [T; 12] {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: Piece) -> &Self::Output {
+        &self[index as usize]
+    }
+}
+
+impl<T> IndexMut<Piece> for [T; 12] {
+    #[inline]
+    fn index_mut(&mut self, index: Piece) -> &mut Self::Output {
+        &mut self[index as usize]
+    }
+}
+
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum MoveType {
@@ -123,6 +149,21 @@ impl Position {
     }
 }
 
+impl<T> Index<Position> for [T; 64] {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: Position) -> &Self::Output {
+        &self[index.0 as usize]
+    }
+}
+
+impl<T> IndexMut<Position> for [T; 64] {
+    #[inline]
+    fn index_mut(&mut self, index: Position) -> &mut Self::Output {
+        &mut self[index.0 as usize]
+    }
+}
+
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct CastlingRights(u8);
@@ -145,7 +186,7 @@ impl CastlingRights {
 
     #[inline]
     pub fn update(&mut self, from: Position, to: Position) {
-        self.0 &= Self::MASKS[from.0 as usize] & Self::MASKS[to.0 as usize];
+        self.0 &= Self::MASKS[from] & Self::MASKS[to];
     }
 }
 
@@ -197,12 +238,18 @@ pub struct BitBoard(u64);
 
 impl BitBoard {
     pub const EMPTY: BitBoard = BitBoard(0);
-    pub const RANK_1: BitBoard = BitBoard(0x00000000000000FF);
-    pub const RANK_2: BitBoard = BitBoard(0x000000000000FF00);
-    pub const RANK_7: BitBoard = BitBoard(0x00FF000000000000);
-    pub const RANK_8: BitBoard = BitBoard(0xFF00000000000000);
+    pub const RANK_MASKS: [BitBoard; 8] = [
+        BitBoard(0x00000000000000FF),
+        BitBoard(0x000000000000FF00),
+        BitBoard(0x0000000000FF0000),
+        BitBoard(0x00000000FF000000),
+        BitBoard(0x000000FF00000000),
+        BitBoard(0x0000FF0000000000),
+        BitBoard(0x00FF000000000000),
+        BitBoard(0xFF00000000000000),
+    ];
 
-    const KING_ATTACK_MASKS: [BitBoard; 64] = {
+    pub const KING_ATTACK_MASKS: [BitBoard; 64] = {
         let mut masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 64 {
@@ -226,7 +273,7 @@ impl BitBoard {
         masks
     };
 
-    const KNIGHT_ATTACK_MASKS: [BitBoard; 64] = {
+    pub const KNIGHT_ATTACK_MASKS: [BitBoard; 64] = {
         let mut masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 64 {
@@ -254,32 +301,28 @@ impl BitBoard {
         masks
     };
 
-    const WHITE_PAWN_ATTACK_MASKS: [BitBoard; 64] = {
-        let mut masks = [Self::EMPTY; 64];
+    pub const PAWN_ATTACK_MASKS: [[BitBoard; 64]; 2] = {
+        let mut white_masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 56 {
             let mut mask = 0u64;
             let (rank, file) = (i / 8, i % 8);
             mask |= if file < 7 { 1u64 << (i + 9) } else { 0 };
             mask |= if file > 0 { 1u64 << (i + 7) } else { 0 };
-            masks[i] = BitBoard(mask);
+            white_masks[i] = BitBoard(mask);
             i += 1;
         }
-        masks
-    };
-
-    const BLACK_PAWN_ATTACK_MASKS: [BitBoard; 64] = {
-        let mut masks = [Self::EMPTY; 64];
+        let mut black_masks = [Self::EMPTY; 64];
         let mut i = 63;
         while i > 7 {
             let mut mask = 0u64;
             let (rank, file) = (i / 8, i % 8);
             mask |= if file < 7 { 1u64 << (i - 7) } else { 0 };
             mask |= if file > 0 { 1u64 << (i - 9) } else { 0 };
-            masks[i] = BitBoard(mask);
+            black_masks[i] = BitBoard(mask);
             i -= 1;
         }
-        masks
+        [white_masks, black_masks]
     };
 
     const RAYS: [[BitBoard; 64]; 8] = {
@@ -351,37 +394,37 @@ impl BitBoard {
         let mut mask = BitBoard::EMPTY;
 
         // North (Index 0) - Positive direction, blocker is LSB
-        let north = Self::RAYS[0][position.0 as usize];
+        let north = Self::RAYS[0][position];
         let north_blockers = north & occupancy;
         mask |= if north_blockers.0 != 0 {
-            north ^ Self::RAYS[0][north_blockers.lsb().0 as usize]
+            north ^ Self::RAYS[0][north_blockers.lsb()]
         } else {
             north
         };
 
         // South (Index 1) - Negative direction, blocker is MSB
-        let south = Self::RAYS[1][position.0 as usize];
+        let south = Self::RAYS[1][position];
         let south_blockers = south & occupancy;
         mask |= if south_blockers.0 != 0 {
-            south ^ Self::RAYS[1][south_blockers.msb().0 as usize]
+            south ^ Self::RAYS[1][south_blockers.msb()]
         } else {
             south
         };
 
         // East (Index 2) - Positive direction, blocker is LSB
-        let east = Self::RAYS[2][position.0 as usize];
+        let east = Self::RAYS[2][position];
         let east_blockers = east & occupancy;
         mask |= if east_blockers.0 != 0 {
-            east ^ Self::RAYS[2][east_blockers.lsb().0 as usize]
+            east ^ Self::RAYS[2][east_blockers.lsb()]
         } else {
             east
         };
 
         // West (Index 3) - Negative direction, blocker is MSB
-        let west = Self::RAYS[3][position.0 as usize];
+        let west = Self::RAYS[3][position];
         let west_blockers = west & occupancy;
         mask |= if west_blockers.0 != 0 {
-            west ^ Self::RAYS[3][west_blockers.msb().0 as usize]
+            west ^ Self::RAYS[3][west_blockers.msb()]
         } else {
             west
         };
@@ -393,37 +436,37 @@ impl BitBoard {
         let mut mask = BitBoard::EMPTY;
 
         // North East (Index 4) - Positive direction, blocker is LSB
-        let north_east = Self::RAYS[4][position.0 as usize];
+        let north_east = Self::RAYS[4][position];
         let north_east_blockers = north_east & occupancy;
         mask |= if north_east_blockers.0 != 0 {
-            north_east ^ Self::RAYS[4][north_east_blockers.lsb().0 as usize]
+            north_east ^ Self::RAYS[4][north_east_blockers.lsb()]
         } else {
             north_east
         };
 
         // South East (Index 5) - Negative direction, blocker is MSB
-        let south_east = Self::RAYS[5][position.0 as usize];
+        let south_east = Self::RAYS[5][position];
         let south_east_blockers = south_east & occupancy;
         mask |= if south_east_blockers.0 != 0 {
-            south_east ^ Self::RAYS[5][south_east_blockers.msb().0 as usize]
+            south_east ^ Self::RAYS[5][south_east_blockers.msb()]
         } else {
             south_east
         };
 
         // North West (Index 6) - Positive direction, blocker is LSB
-        let north_west = Self::RAYS[6][position.0 as usize];
+        let north_west = Self::RAYS[6][position];
         let north_west_blockers = north_west & occupancy;
         mask |= if north_west_blockers.0 != 0 {
-            north_west ^ Self::RAYS[6][north_west_blockers.lsb().0 as usize]
+            north_west ^ Self::RAYS[6][north_west_blockers.lsb()]
         } else {
             north_west
         };
 
         // South West (Index 7) - Negative direction, blocker is MSB
-        let south_west = Self::RAYS[7][position.0 as usize];
+        let south_west = Self::RAYS[7][position];
         let south_west_blockers = south_west & occupancy;
         mask |= if south_west_blockers.0 != 0 {
-            south_west ^ Self::RAYS[7][south_west_blockers.msb().0 as usize]
+            south_west ^ Self::RAYS[7][south_west_blockers.msb()]
         } else {
             south_west
         };
@@ -519,112 +562,11 @@ impl ShrAssign<u32> for BitBoard {
     }
 }
 
-struct Mailbox([Option<Piece>; 64]);
-
-impl Mailbox {
-    fn new() -> Self {
-        Self([
-            Some(Piece::WhiteRook),
-            Some(Piece::WhiteKnight),
-            Some(Piece::WhiteBishop),
-            Some(Piece::WhiteQueen),
-            Some(Piece::WhiteKing),
-            Some(Piece::WhiteBishop),
-            Some(Piece::WhiteKnight),
-            Some(Piece::WhiteRook),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            Some(Piece::WhitePawn),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackPawn),
-            Some(Piece::BlackRook),
-            Some(Piece::BlackKnight),
-            Some(Piece::BlackBishop),
-            Some(Piece::BlackQueen),
-            Some(Piece::BlackKing),
-            Some(Piece::BlackBishop),
-            Some(Piece::BlackKnight),
-            Some(Piece::BlackRook),
-        ])
-    }
-}
-
-impl Index<Position> for Mailbox {
-    type Output = Option<Piece>;
-    fn index(&self, index: Position) -> &Self::Output {
-        &self.0[index.0 as usize]
-    }
-}
-
-impl IndexMut<Position> for Mailbox {
-    fn index_mut(&mut self, index: Position) -> &mut Self::Output {
-        &mut self.0[index.0 as usize]
-    }
-}
-
-impl Index<Color> for [BitBoard; 2] {
-    type Output = BitBoard;
-    #[inline]
-    fn index(&self, index: Color) -> &Self::Output {
-        &self[index as usize]
-    }
-}
-
-impl IndexMut<Color> for [BitBoard; 2] {
-    #[inline]
-    fn index_mut(&mut self, index: Color) -> &mut Self::Output {
-        &mut self[index as usize]
-    }
-}
-
 pub struct Board {
     pieces: [BitBoard; 12],
-    colors: [BitBoard; 2],
+    pub colors: [BitBoard; 2],
     occupancy: BitBoard,
-    mailbox: Mailbox,
+    mailbox: [Option<Piece>; 64],
 }
 
 impl Board {
@@ -644,7 +586,72 @@ impl Board {
                 BitBoard(0x0800000000000000), // Black Queens
                 BitBoard(0x1000000000000000), // Black Kings
             ],
-            mailbox: Mailbox::new(),
+            mailbox: [
+                Some(Piece::WhiteRook),
+                Some(Piece::WhiteKnight),
+                Some(Piece::WhiteBishop),
+                Some(Piece::WhiteQueen),
+                Some(Piece::WhiteKing),
+                Some(Piece::WhiteBishop),
+                Some(Piece::WhiteKnight),
+                Some(Piece::WhiteRook),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                Some(Piece::WhitePawn),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackPawn),
+                Some(Piece::BlackRook),
+                Some(Piece::BlackKnight),
+                Some(Piece::BlackBishop),
+                Some(Piece::BlackQueen),
+                Some(Piece::BlackKing),
+                Some(Piece::BlackBishop),
+                Some(Piece::BlackKnight),
+                Some(Piece::BlackRook),
+            ],
             colors: [BitBoard(0x000000000000FFFF), BitBoard(0xFFFF000000000000)],
             occupancy: BitBoard(0xFFFF00000000FFFF),
         }
@@ -652,9 +659,9 @@ impl Board {
 
     pub fn set_piece(&mut self, position: Position, piece: Piece) {
         if let Some(idx) = self.mailbox[position] {
-            self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
+            self.pieces[idx] = self.pieces[idx].unset(position);
         }
-        self.pieces[piece as usize] = self.pieces[piece as usize].set(position);
+        self.pieces[piece] = self.pieces[piece].set(position);
         self.mailbox[position] = Some(piece);
         self.occupancy = self.occupancy.set(position);
         self.colors[piece.color()] = self.colors[piece.color()].set(position);
@@ -664,7 +671,7 @@ impl Board {
         let Some(idx) = self.mailbox[position] else {
             return;
         };
-        self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
+        self.pieces[idx] = self.pieces[idx].unset(position);
         self.mailbox[position] = None;
         self.occupancy = self.occupancy.unset(position);
         self.colors[idx.color()] = self.colors[idx.color()].unset(position);
@@ -687,15 +694,15 @@ impl Board {
             return (None, None);
         };
 
-        let next_from_board = self.pieces[from_idx as usize].unset(from).set(to);
+        let next_from_board = self.pieces[from_idx].unset(from).set(to);
 
         let captured = self.mailbox[to];
         if let Some(to_idx) = captured {
-            self.pieces[to_idx as usize] = self.pieces[to_idx as usize].unset(to);
+            self.pieces[to_idx] = self.pieces[to_idx].unset(to);
             self.colors[to_idx.color()] = self.colors[to_idx.color()].unset(to);
         }
 
-        self.pieces[from_idx as usize] = next_from_board;
+        self.pieces[from_idx] = next_from_board;
         self.mailbox[to] = Some(from_idx);
         self.mailbox[from] = None;
         self.colors[from_idx.color()] = self.colors[from_idx.color()].unset(from).set(to);
