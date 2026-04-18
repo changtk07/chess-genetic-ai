@@ -238,6 +238,7 @@ pub struct BitBoard(u64);
 
 impl BitBoard {
     pub const EMPTY: BitBoard = BitBoard(0);
+
     pub const RANK_MASKS: [BitBoard; 8] = [
         BitBoard(0x00000000000000FF),
         BitBoard(0x000000000000FF00),
@@ -345,7 +346,6 @@ impl BitBoard {
             }
             masks
         }
-
         [
             generate_ray(0, 1),   // North
             generate_ray(0, -1),  // South
@@ -388,6 +388,11 @@ impl BitBoard {
     fn msb(self) -> Position {
         debug_assert!(self.0 != 0, "Called msb() on an empty BitBoard");
         Position(63 - self.0.leading_zeros() as u8)
+    }
+
+    #[inline]
+    pub fn to_positions(self) -> Vec<Position> {
+        self.into_iter().collect()
     }
 
     fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
@@ -476,6 +481,21 @@ impl BitBoard {
 
     fn queen_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
         Self::rook_attack_mask(position, occupancy) | Self::bishop_attack_mask(position, occupancy)
+    }
+}
+
+impl Iterator for BitBoard {
+    type Item = Position;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0 == 0 {
+            None
+        } else {
+            let p = Position(self.0.trailing_zeros() as u8);
+            self.0 &= self.0 - 1;
+            Some(p)
+        }
     }
 }
 

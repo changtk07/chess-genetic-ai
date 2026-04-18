@@ -197,7 +197,7 @@ impl State {
 
     fn generate_pawn_moves(&self, position: Position, moves: &mut Vec<Move>) {
         self.generate_pawn_push_moves(position, moves);
-        // TODO: attack
+        self.generate_pawn_attack_moves(position, moves);
     }
 
     fn generate_pawn_push_moves(&self, position: Position, moves: &mut Vec<Move>) {
@@ -239,5 +239,41 @@ impl State {
                 ));
             }
         }
+    }
+
+    fn generate_pawn_attack_moves(&self, position: Position, moves: &mut Vec<Move>) {
+        let attack_mask = BitBoard::PAWN_ATTACK_MASKS[self.turn][position];
+
+        if let Some(en_passant_position) = self.en_passant {
+            if en_passant_position.mask() & attack_mask != BitBoard::EMPTY {
+                moves.push(Move::new(
+                    position,
+                    en_passant_position,
+                    MoveType::EnPassant,
+                ));
+            }
+        }
+
+        let opponent_mask = self.board.colors[self.turn.flip()];
+        let end_rank_mask = match self.turn {
+            Color::White => BitBoard::RANK_MASKS[7],
+            Color::Black => BitBoard::RANK_MASKS[0],
+        };
+
+        (opponent_mask & attack_mask)
+            .to_positions()
+            .into_iter()
+            .for_each(|p| {
+                if end_rank_mask.is_not_empty(p) {
+                    moves.extend([
+                        Move::new(position, p, MoveType::PromotionQueen),
+                        Move::new(position, p, MoveType::PromotionRook),
+                        Move::new(position, p, MoveType::PromotionBishop),
+                        Move::new(position, p, MoveType::PromotionKnight),
+                    ]);
+                } else {
+                    moves.push(Move::new(position, p, MoveType::Standard));
+                }
+            });
     }
 }
