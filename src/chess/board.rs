@@ -127,6 +127,10 @@ impl Position {
     pub(crate) const F8: Self = Self(61);
     pub(crate) const G8: Self = Self(62);
     pub(crate) const H8: Self = Self(63);
+    pub(crate) const QS_CASTLE_ROOK: [(Self, Self); 2] =
+        [(Self::A1, Self::D1), (Self::A8, Self::D8)];
+    pub(crate) const KS_CASTLE_ROOK: [(Self, Self); 2] =
+        [(Self::H1, Self::F1), (Self::H8, Self::F8)];
 
     pub(crate) const fn middle_of(a: Self, b: Self) -> Self {
         Self((a.0 + b.0) / 2)

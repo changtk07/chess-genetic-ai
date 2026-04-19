@@ -118,17 +118,11 @@ impl State {
                 self.board.set_piece(from, Piece::pawn(self.turn));
             }
             MoveType::KingSideCastling => {
-                let (rook_from, rook_to) = match self.turn {
-                    Color::White => (Position::H1, Position::F1),
-                    Color::Black => (Position::H8, Position::F8),
-                };
+                let (rook_from, rook_to) = Position::KS_CASTLE_ROOK[self.turn];
                 self.board.move_piece(rook_to, rook_from);
             }
             MoveType::QueenSideCastling => {
-                let (rook_from, rook_to) = match self.turn {
-                    Color::White => (Position::A1, Position::D1),
-                    Color::Black => (Position::A8, Position::D8),
-                };
+                let (rook_from, rook_to) = Position::QS_CASTLE_ROOK[self.turn];
                 self.board.move_piece(rook_to, rook_from);
             }
             _ => (),
@@ -174,20 +168,14 @@ impl State {
     }
 
     fn make_move_king_side_castling(&mut self) {
-        let (rook_from, rook_to) = match self.turn {
-            Color::White => (Position::H1, Position::F1),
-            Color::Black => (Position::H8, Position::F8),
-        };
+        let (rook_from, rook_to) = Position::KS_CASTLE_ROOK[self.turn];
         self.board.move_piece(rook_from, rook_to);
         self.en_passant = None;
         self.halfmove_clock += 1;
     }
 
     fn make_move_queen_side_castling(&mut self) {
-        let (rook_from, rook_to) = match self.turn {
-            Color::White => (Position::A1, Position::D1),
-            Color::Black => (Position::A8, Position::D8),
-        };
+        let (rook_from, rook_to) = Position::QS_CASTLE_ROOK[self.turn];
         self.board.move_piece(rook_from, rook_to);
         self.en_passant = None;
         self.halfmove_clock += 1;
