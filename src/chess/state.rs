@@ -193,21 +193,20 @@ impl State {
     fn generate_moves(&self) -> ArrayVec<Move, 256> {
         let mut moves = ArrayVec::<Move, 256>::new();
         self.board.pieces[Piece::pawn(self.turn)]
-            .into_iter()
             .for_each(|position| self.generate_pawn_moves(position, &mut moves));
         self.board.pieces[Piece::knight(self.turn)]
-            .into_iter()
             .for_each(|position| self.generate_knight_moves(position, &mut moves));
         self.board.pieces[Piece::bishop(self.turn)]
-            .into_iter()
             .for_each(|position| self.generate_bishop_moves(position, &mut moves));
         self.board.pieces[Piece::rook(self.turn)]
-            .into_iter()
             .for_each(|position| self.generate_rook_moves(position, &mut moves));
         self.board.pieces[Piece::queen(self.turn)]
-            .into_iter()
             .for_each(|position| self.generate_queen_moves(position, &mut moves));
-        // TODO
+        self.board.pieces[Piece::king(self.turn)]
+            .for_each(|position| self.generate_king_moves(position, &mut moves));
+        // TODO:
+        // 1. filter moves that leave king in check
+        // 2. generate castling moves
         moves
     }
 
@@ -271,7 +270,7 @@ impl State {
             Color::Black => BitBoard::RANK_MASKS[0],
         };
 
-        (opponent_mask & attack_mask).into_iter().for_each(|p| {
+        (opponent_mask & attack_mask).for_each(|p| {
             if end_rank_mask.is_not_empty(p) {
                 moves.extend([
                     Move::new(position, p, MoveType::PromotionQueen),
@@ -289,7 +288,6 @@ impl State {
         let attack_mask = BitBoard::KNIGHT_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask)
-            .into_iter()
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
@@ -297,7 +295,6 @@ impl State {
         let attack_mask = BitBoard::bishop_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask)
-            .into_iter()
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
@@ -305,7 +302,6 @@ impl State {
         let attack_mask = BitBoard::rook_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask)
-            .into_iter()
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
@@ -313,7 +309,15 @@ impl State {
         let attack_mask = BitBoard::queen_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask)
-            .into_iter()
+            .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
+    }
+
+    fn generate_king_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+        let attack_mask = BitBoard::KING_ATTACK_MASKS[position];
+        let friendly_mask = self.board.colors[self.turn];
+        let opponent_attack_mask = self.board.opponent_attack_mask(self.turn);
+
+        (attack_mask & !friendly_mask & !opponent_attack_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 }
