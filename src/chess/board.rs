@@ -390,11 +390,6 @@ impl BitBoard {
         Position(63 - self.0.leading_zeros() as u8)
     }
 
-    #[inline]
-    pub fn to_positions(self) -> Vec<Position> {
-        self.into_iter().collect()
-    }
-
     fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
         let mut mask = BitBoard::EMPTY;
 
@@ -583,10 +578,10 @@ impl ShrAssign<u32> for BitBoard {
 }
 
 pub struct Board {
-    pieces: [BitBoard; 12],
+    pub pieces: [BitBoard; 12],
     pub colors: [BitBoard; 2],
-    occupancy: BitBoard,
-    mailbox: [Option<Piece>; 64],
+    pub occupancy: BitBoard,
+    pub mailbox: [Option<Piece>; 64],
 }
 
 impl Board {
