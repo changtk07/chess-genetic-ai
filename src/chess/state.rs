@@ -64,7 +64,7 @@ impl State {
             MoveType::Standard => self.make_move_standard(moved, captured),
         }
 
-        self.castling_rights.update(from, to);
+        self.castling_rights = self.castling_rights.update(from, to);
         self.fullmove_number += self.turn as usize;
         self.turn = self.turn.flip();
     }
@@ -190,7 +190,7 @@ impl State {
     // Move Generation
     // ------------------------------------------------------------------------
 
-    fn generate_moves(&self) -> ArrayVec<Move, 256> {
+    pub fn generate_moves(&self) -> ArrayVec<Move, 256> {
         let mut moves = ArrayVec::<Move, 256>::new();
         self.board.pieces[Piece::pawn(self.turn)]
             .for_each(|position| self.generate_pawn_moves(position, &mut moves));
