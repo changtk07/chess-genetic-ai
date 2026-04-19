@@ -169,6 +169,16 @@ impl<T> IndexMut<Position> for [T; 64] {
 pub struct CastlingRights(u8);
 
 impl CastlingRights {
+    // Bit layout (4 bits total, LSB first):
+    //   Bit 0 (0b0001): Black queenside  — cleared when A8 rook or E8 king moves
+    //   Bit 1 (0b0010): Black kingside   — cleared when H8 rook or E8 king moves
+    //   Bit 2 (0b0100): White queenside  — cleared when A1 rook or E1 king moves
+    //   Bit 3 (0b1000): White kingside   — cleared when H1 rook or E1 king moves
+    pub const BLACK_QUEENSIDE: u8 = 0b0001;
+    pub const BLACK_KINGSIDE: u8 = 0b0010;
+    pub const WHITE_QUEENSIDE: u8 = 0b0100;
+    pub const WHITE_KINGSIDE: u8 = 0b1000;
+
     const MASKS: [u8; 64] = [
         11, 15, 15, 15, 3, 15, 15, 7, // 0-7
         15, 15, 15, 15, 15, 15, 15, 15, // 8-15
@@ -680,9 +690,41 @@ impl Board {
         self.occupancy.is_empty(position)
     }
 
+    pub fn opponent_attack_mask(&self, turn: Color) -> BitBoard {
+        let opponent = turn.flip();
+        let occupancy_without_king = self.occupancy & !self.pieces[Piece::king(turn)];
+
+        let mut mask = self.pieces[Piece::pawn(opponent)]
+            .map(|p| BitBoard::PAWN_ATTACK_MASKS[opponent][p])
+            .fold(BitBoard::EMPTY, |acc, attack| acc | attack);
+
+        mask = self.pieces[Piece::knight(opponent)]
+            .map(|p| BitBoard::KNIGHT_ATTACK_MASKS[p])
+            .fold(mask, |acc, attack| acc | attack);
+
+        mask = self.pieces[Piece::king(opponent)]
+            .map(|p| BitBoard::KING_ATTACK_MASKS[p])
+            .fold(mask, |acc, attack| acc | attack);
+
+        mask = self.pieces[Piece::bishop(opponent)]
+            .map(|p| BitBoard::bishop_attack_mask(p, occupancy_without_king))
+            .fold(mask, |acc, attack| acc | attack);
+
+        mask = self.pieces[Piece::rook(opponent)]
+            .map(|p| BitBoard::rook_attack_mask(p, occupancy_without_king))
+            .fold(mask, |acc, attack| acc | attack);
+
+        mask = self.pieces[Piece::queen(opponent)]
+            .map(|p| BitBoard::queen_attack_mask(p, occupancy_without_king))
+            .fold(mask, |acc, attack| acc | attack);
+
+        mask
+    }
+
     pub fn set_piece(&mut self, position: Position, piece: Piece) {
         if let Some(idx) = self.mailbox[position] {
             self.pieces[idx] = self.pieces[idx].unset(position);
+            self.colors[idx.color()] = self.colors[idx.color()].unset(position);
         }
         self.pieces[piece] = self.pieces[piece].set(position);
         self.mailbox[position] = Some(piece);
