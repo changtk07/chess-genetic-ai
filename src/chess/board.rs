@@ -390,7 +390,7 @@ impl BitBoard {
         Position(63 - self.0.leading_zeros() as u8)
     }
 
-    fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+    pub fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
         let mut mask = BitBoard::EMPTY;
 
         // North (Index 0) - Positive direction, blocker is LSB
@@ -432,7 +432,7 @@ impl BitBoard {
         mask
     }
 
-    fn bishop_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+    pub fn bishop_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
         let mut mask = BitBoard::EMPTY;
 
         // North East (Index 4) - Positive direction, blocker is LSB
@@ -474,7 +474,7 @@ impl BitBoard {
         mask
     }
 
-    fn queen_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+    pub fn queen_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
         Self::rook_attack_mask(position, occupancy) | Self::bishop_attack_mask(position, occupancy)
     }
 }
@@ -672,6 +672,14 @@ impl Board {
         }
     }
 
+    pub fn is_occupied(&self, position: Position) -> bool {
+        self.occupancy.is_not_empty(position)
+    }
+
+    pub fn is_not_occupied(&self, position: Position) -> bool {
+        self.occupancy.is_empty(position)
+    }
+
     pub fn set_piece(&mut self, position: Position, piece: Piece) {
         if let Some(idx) = self.mailbox[position] {
             self.pieces[idx] = self.pieces[idx].unset(position);
@@ -690,18 +698,6 @@ impl Board {
         self.mailbox[position] = None;
         self.occupancy = self.occupancy.unset(position);
         self.colors[idx.color()] = self.colors[idx.color()].unset(position);
-    }
-
-    pub fn get_color(&self, position: Position) -> Option<Color> {
-        self.mailbox[position].map(|p| p.color())
-    }
-
-    pub fn is_occupied(&self, position: Position) -> bool {
-        self.occupancy.is_not_empty(position)
-    }
-
-    pub fn is_not_occupied(&self, position: Position) -> bool {
-        self.occupancy.is_empty(position)
     }
 
     pub fn move_piece(&mut self, from: Position, to: Position) -> (Option<Piece>, Option<Piece>) {

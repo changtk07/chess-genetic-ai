@@ -198,6 +198,15 @@ impl State {
         self.board.pieces[Piece::knight(self.turn)]
             .into_iter()
             .for_each(|position| self.generate_knight_moves(position, &mut moves));
+        self.board.pieces[Piece::bishop(self.turn)]
+            .into_iter()
+            .for_each(|position| self.generate_bishop_moves(position, &mut moves));
+        self.board.pieces[Piece::rook(self.turn)]
+            .into_iter()
+            .for_each(|position| self.generate_rook_moves(position, &mut moves));
+        self.board.pieces[Piece::queen(self.turn)]
+            .into_iter()
+            .for_each(|position| self.generate_queen_moves(position, &mut moves));
         // TODO
         moves
     }
@@ -278,6 +287,30 @@ impl State {
 
     fn generate_knight_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
         let attack_mask = BitBoard::KNIGHT_ATTACK_MASKS[position];
+        let friendly_mask = self.board.colors[self.turn];
+        (attack_mask & !friendly_mask)
+            .into_iter()
+            .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
+    }
+
+    fn generate_bishop_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+        let attack_mask = BitBoard::bishop_attack_mask(position, self.board.occupancy);
+        let friendly_mask = self.board.colors[self.turn];
+        (attack_mask & !friendly_mask)
+            .into_iter()
+            .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
+    }
+
+    fn generate_rook_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+        let attack_mask = BitBoard::rook_attack_mask(position, self.board.occupancy);
+        let friendly_mask = self.board.colors[self.turn];
+        (attack_mask & !friendly_mask)
+            .into_iter()
+            .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
+    }
+
+    fn generate_queen_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+        let attack_mask = BitBoard::queen_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask)
             .into_iter()
