@@ -195,6 +195,9 @@ impl State {
         self.board.pieces[Piece::pawn(self.turn)]
             .into_iter()
             .for_each(|position| self.generate_pawn_moves(position, &mut moves));
+        self.board.pieces[Piece::knight(self.turn)]
+            .into_iter()
+            .for_each(|position| self.generate_knight_moves(position, &mut moves));
         // TODO
         moves
     }
@@ -271,5 +274,13 @@ impl State {
                 moves.push(Move::new(position, p, MoveType::Standard));
             }
         });
+    }
+
+    fn generate_knight_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+        let attack_mask = BitBoard::KNIGHT_ATTACK_MASKS[position];
+        let friendly_mask = self.board.colors[self.turn];
+        (attack_mask & !friendly_mask)
+            .into_iter()
+            .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 }
