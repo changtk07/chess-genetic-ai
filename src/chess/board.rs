@@ -113,29 +113,35 @@ pub(crate) enum MoveType {
 pub(crate) struct Position(pub(crate) u8);
 
 impl Position {
-    pub(crate) const H1: Self = Position(7);
-    pub(crate) const A1: Self = Position(0);
-    pub(crate) const H8: Self = Position(63);
-    pub(crate) const A8: Self = Position(56);
-    pub(crate) const F1: Self = Position(5);
-    pub(crate) const D1: Self = Position(3);
-    pub(crate) const F8: Self = Position(61);
-    pub(crate) const D8: Self = Position(59);
+    pub(crate) const A1: Self = Self(0);
+    pub(crate) const C1: Self = Self(2);
+    pub(crate) const D1: Self = Self(3);
+    pub(crate) const E1: Self = Self(4);
+    pub(crate) const F1: Self = Self(5);
+    pub(crate) const G1: Self = Self(6);
+    pub(crate) const H1: Self = Self(7);
+    pub(crate) const A8: Self = Self(56);
+    pub(crate) const C8: Self = Self(58);
+    pub(crate) const D8: Self = Self(59);
+    pub(crate) const E8: Self = Self(60);
+    pub(crate) const F8: Self = Self(61);
+    pub(crate) const G8: Self = Self(62);
+    pub(crate) const H8: Self = Self(63);
 
     pub(crate) const fn middle_of(a: Self, b: Self) -> Self {
-        Position((a.0 + b.0) / 2)
+        Self((a.0 + b.0) / 2)
     }
 
     pub(crate) const fn en_passant_captured(from: Self, to: Self) -> Self {
-        Position(((from.0 >> 3) << 3) + (to.0 & 0b111)) // = (from/8)*8 + (to%8)
+        Self(((from.0 >> 3) << 3) + (to.0 & 0b111)) // = (from/8)*8 + (to%8)
     }
 
     pub(crate) const fn mask(self) -> BitBoard {
         BitBoard(1u64 << self.0)
     }
 
-    pub(crate) const fn offset_unchecked(self, delta: i8) -> Position {
-        Position((self.0 as i8 + delta) as u8)
+    pub(crate) const fn offset_unchecked(self, delta: i8) -> Self {
+        Self((self.0 as i8 + delta) as u8)
     }
 }
 
@@ -164,10 +170,8 @@ impl CastlingRights {
     //   Bit 1 (0b0010): Black kingside   — cleared when H8 rook or E8 king moves
     //   Bit 2 (0b0100): White queenside  — cleared when A1 rook or E1 king moves
     //   Bit 3 (0b1000): White kingside   — cleared when H1 rook or E1 king moves
-    pub(crate) const BLACK_QUEENSIDE: CastlingRights = CastlingRights(0b0001);
-    pub(crate) const BLACK_KINGSIDE: CastlingRights = CastlingRights(0b0010);
-    pub(crate) const WHITE_QUEENSIDE: CastlingRights = CastlingRights(0b0100);
-    pub(crate) const WHITE_KINGSIDE: CastlingRights = CastlingRights(0b1000);
+    pub(crate) const QUEEN_SIDE: [Self; 2] = [Self(0b0100), Self(0b0001)];
+    pub(crate) const KING_SIDE: [Self; 2] = [Self(0b1000), Self(0b0010)];
 
     const MASKS: [u8; 64] = [
         11, 15, 15, 15, 3, 15, 15, 7, // 0-7
@@ -184,27 +188,27 @@ impl CastlingRights {
         Self(0b1111)
     }
 
-    pub(crate) const fn has(self, right: CastlingRights) -> bool {
+    pub(crate) const fn has(self, right: Self) -> bool {
         (self.0 & right.0) != 0
     }
 
-    pub(crate) fn update(self, from: Position, to: Position) -> CastlingRights {
-        CastlingRights(self.0 & Self::MASKS[from] & Self::MASKS[to])
+    pub(crate) fn update(self, from: Position, to: Position) -> Self {
+        Self(self.0 & Self::MASKS[from] & Self::MASKS[to])
     }
 }
 
 impl MoveType {
     const fn new(val: u16) -> Self {
         match val {
-            1 => MoveType::DoublePush,
-            2 => MoveType::EnPassant,
-            3 => MoveType::PromotionRook,
-            4 => MoveType::PromotionKnight,
-            5 => MoveType::PromotionBishop,
-            6 => MoveType::PromotionQueen,
-            7 => MoveType::KingSideCastling,
-            8 => MoveType::QueenSideCastling,
-            _ => MoveType::Standard,
+            1 => Self::DoublePush,
+            2 => Self::EnPassant,
+            3 => Self::PromotionRook,
+            4 => Self::PromotionKnight,
+            5 => Self::PromotionBishop,
+            6 => Self::PromotionQueen,
+            7 => Self::KingSideCastling,
+            8 => Self::QueenSideCastling,
+            _ => Self::Standard,
         }
     }
 }
@@ -214,12 +218,26 @@ impl MoveType {
 pub(crate) struct Move(u16);
 
 impl Move {
+    pub(crate) const QUEEN_SIDE_CASTLING: [Self; 2] = [
+        Self::new(Position::E1, Position::C1, MoveType::QueenSideCastling),
+        Self::new(Position::E8, Position::C8, MoveType::QueenSideCastling),
+    ];
+
+    pub(crate) const KING_SIDE_CASTLING: [Self; 2] = [
+        Self::new(Position::E1, Position::G1, MoveType::KingSideCastling),
+        Self::new(Position::E8, Position::G8, MoveType::KingSideCastling),
+    ];
+
     pub(crate) const fn new(from: Position, to: Position, move_type: MoveType) -> Self {
         let mut mv = 0u16;
         mv |= (from.0 as u16 & 0x3F) << 10;
         mv |= (to.0 as u16 & 0x3F) << 4;
         mv |= (move_type as u16) & 0x0F;
-        Move(mv)
+        Self(mv)
+    }
+
+    pub(crate) const fn unwrap(self) -> (Position, Position, MoveType) {
+        (self.from(), self.to(), self.move_type())
     }
 
     pub(crate) const fn from(self) -> Position {
@@ -240,20 +258,32 @@ impl Move {
 pub(crate) struct BitBoard(u64);
 
 impl BitBoard {
-    pub(crate) const EMPTY: BitBoard = BitBoard(0);
+    pub(crate) const EMPTY: Self = Self(0);
 
-    pub(crate) const RANK_MASKS: [BitBoard; 8] = [
-        BitBoard(0x00000000000000FF),
-        BitBoard(0x000000000000FF00),
-        BitBoard(0x0000000000FF0000),
-        BitBoard(0x00000000FF000000),
-        BitBoard(0x000000FF00000000),
-        BitBoard(0x0000FF0000000000),
-        BitBoard(0x00FF000000000000),
-        BitBoard(0xFF00000000000000),
+    pub(crate) const QS_CASTLE_PATH: [Self; 2] =
+        [Self(0x000000000000001C), Self(0x1C00000000000000)];
+
+    pub(crate) const KS_CASTLE_PATH: [Self; 2] =
+        [Self(0x0000000000000070), Self(0x7000000000000000)];
+
+    pub(crate) const QS_CASTLE_GAP: [Self; 2] =
+        [Self(0x000000000000000E), Self(0x0E00000000000000)];
+
+    pub(crate) const KS_CASTLE_GAP: [Self; 2] =
+        [Self(0x0000000000000060), Self(0x6000000000000000)];
+
+    pub(crate) const RANK_MASKS: [Self; 8] = [
+        Self(0x00000000000000FF),
+        Self(0x000000000000FF00),
+        Self(0x0000000000FF0000),
+        Self(0x00000000FF000000),
+        Self(0x000000FF00000000),
+        Self(0x0000FF0000000000),
+        Self(0x00FF000000000000),
+        Self(0xFF00000000000000),
     ];
 
-    pub(crate) const KING_ATTACK_MASKS: [BitBoard; 64] = {
+    pub(crate) const KING_ATTACK_MASKS: [Self; 64] = {
         let mut masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 64 {
@@ -277,7 +307,7 @@ impl BitBoard {
         masks
     };
 
-    pub(crate) const KNIGHT_ATTACK_MASKS: [BitBoard; 64] = {
+    pub(crate) const KNIGHT_ATTACK_MASKS: [Self; 64] = {
         let mut masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 64 {
@@ -299,13 +329,13 @@ impl BitBoard {
                 mask |= if file < 7 { 1u64 << (i - 15) } else { 0 };
                 mask |= if file > 0 { 1u64 << (i - 17) } else { 0 };
             }
-            masks[i] = BitBoard(mask);
+            masks[i] = Self(mask);
             i += 1;
         }
         masks
     };
 
-    pub(crate) const PAWN_ATTACK_MASKS: [[BitBoard; 64]; 2] = {
+    pub(crate) const PAWN_ATTACK_MASKS: [[Self; 64]; 2] = {
         let mut white_masks = [Self::EMPTY; 64];
         let mut i = 0;
         while i < 56 {
@@ -313,7 +343,7 @@ impl BitBoard {
             let file = i % 8;
             mask |= if file < 7 { 1u64 << (i + 9) } else { 0 };
             mask |= if file > 0 { 1u64 << (i + 7) } else { 0 };
-            white_masks[i] = BitBoard(mask);
+            white_masks[i] = Self(mask);
             i += 1;
         }
         let mut black_masks = [Self::EMPTY; 64];
@@ -323,13 +353,13 @@ impl BitBoard {
             let file = i % 8;
             mask |= if file < 7 { 1u64 << (i - 7) } else { 0 };
             mask |= if file > 0 { 1u64 << (i - 9) } else { 0 };
-            black_masks[i] = BitBoard(mask);
+            black_masks[i] = Self(mask);
             i -= 1;
         }
         [white_masks, black_masks]
     };
 
-    const RAYS: [[BitBoard; 64]; 8] = {
+    const RAYS: [[Self; 64]; 8] = {
         const fn generate_ray(df: i8, dr: i8) -> [BitBoard; 64] {
             let mut masks = [BitBoard(0); 64];
             let mut i = 0;
@@ -369,12 +399,12 @@ impl BitBoard {
         self.0 & position.mask().0 != 0
     }
 
-    const fn set(self, position: Position) -> BitBoard {
-        BitBoard(self.0 | position.mask().0)
+    const fn set(self, position: Position) -> Self {
+        Self(self.0 | position.mask().0)
     }
 
-    const fn unset(self, position: Position) -> BitBoard {
-        BitBoard(self.0 & !position.mask().0)
+    const fn unset(self, position: Position) -> Self {
+        Self(self.0 & !position.mask().0)
     }
 
     fn lsb(self) -> Position {
@@ -387,8 +417,8 @@ impl BitBoard {
         Position(63 - self.0.leading_zeros() as u8)
     }
 
-    pub(crate) fn rook_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
-        let mut mask = BitBoard::EMPTY;
+    pub(crate) fn rook_attack_mask(position: Position, occupancy: Self) -> Self {
+        let mut mask = Self::EMPTY;
 
         // North (Index 0) - Positive direction, blocker is LSB
         let north = Self::RAYS[0][position];
@@ -429,8 +459,8 @@ impl BitBoard {
         mask
     }
 
-    pub(crate) fn bishop_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
-        let mut mask = BitBoard::EMPTY;
+    pub(crate) fn bishop_attack_mask(position: Position, occupancy: Self) -> Self {
+        let mut mask = Self::EMPTY;
 
         // North East (Index 4) - Positive direction, blocker is LSB
         let north_east = Self::RAYS[4][position];
@@ -471,7 +501,7 @@ impl BitBoard {
         mask
     }
 
-    pub(crate) fn queen_attack_mask(position: Position, occupancy: BitBoard) -> BitBoard {
+    pub(crate) fn queen_attack_mask(position: Position, occupancy: Self) -> Self {
         Self::rook_attack_mask(position, occupancy) | Self::bishop_attack_mask(position, occupancy)
     }
 }
@@ -677,32 +707,32 @@ impl Board {
         self.occupancy.is_empty(position)
     }
 
-    pub(crate) fn opponent_attack_mask(&self, turn: Color) -> BitBoard {
-        let opponent = turn.flip();
-        let occupancy_without_king = self.occupancy & !self.pieces[Piece::king(turn)];
+    pub(crate) fn color_attack_mask(&self, color: Color, ignroe: BitBoard) -> BitBoard {
+        let mut mask = BitBoard::EMPTY;
+        let occupancy_with_ignore = self.occupancy & !ignroe;
 
-        let mut mask = self.pieces[Piece::pawn(opponent)]
-            .map(|p| BitBoard::PAWN_ATTACK_MASKS[opponent][p])
-            .fold(BitBoard::EMPTY, |acc, attack| acc | attack);
+        mask = self.pieces[Piece::pawn(color)]
+            .map(|p| BitBoard::PAWN_ATTACK_MASKS[color][p])
+            .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::knight(opponent)]
+        mask = self.pieces[Piece::knight(color)]
             .map(|p| BitBoard::KNIGHT_ATTACK_MASKS[p])
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::king(opponent)]
+        mask = self.pieces[Piece::king(color)]
             .map(|p| BitBoard::KING_ATTACK_MASKS[p])
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::bishop(opponent)]
-            .map(|p| BitBoard::bishop_attack_mask(p, occupancy_without_king))
+        mask = self.pieces[Piece::bishop(color)]
+            .map(|p| BitBoard::bishop_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::rook(opponent)]
-            .map(|p| BitBoard::rook_attack_mask(p, occupancy_without_king))
+        mask = self.pieces[Piece::rook(color)]
+            .map(|p| BitBoard::rook_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::queen(opponent)]
-            .map(|p| BitBoard::queen_attack_mask(p, occupancy_without_king))
+        mask = self.pieces[Piece::queen(color)]
+            .map(|p| BitBoard::queen_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
         mask

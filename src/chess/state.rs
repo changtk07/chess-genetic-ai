@@ -38,10 +38,7 @@ impl State {
     // ------------------------------------------------------------------------
 
     pub fn make_move(&mut self, mv: Move) {
-        let from = mv.from();
-        let to = mv.to();
-        let move_type = mv.move_type();
-
+        let (from, to, move_type) = mv.unwrap();
         let (moved, captured) = self.board.move_piece(from, to);
 
         self.history.push(History {
@@ -204,9 +201,7 @@ impl State {
             .for_each(|position| self.generate_queen_moves(position, &mut moves));
         self.board.pieces[Piece::king(self.turn)]
             .for_each(|position| self.generate_king_moves(position, &mut moves));
-        // TODO:
-        // 1. filter moves that leave king in check
-        // 2. generate castling moves
+        // TODO: filter moves that leave king in check
         moves
     }
 
@@ -315,9 +310,29 @@ impl State {
     fn generate_king_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
         let attack_mask = BitBoard::KING_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
-        let opponent_attack_mask = self.board.opponent_attack_mask(self.turn);
+        let opponent_attack_mask = self
+            .board
+            .color_attack_mask(self.turn.flip(), self.board.pieces[Piece::king(self.turn)]);
 
         (attack_mask & !friendly_mask & !opponent_attack_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
+
+        if self
+            .castling_rights
+            .has(CastlingRights::QUEEN_SIDE[self.turn])
+            && BitBoard::QS_CASTLE_PATH[self.turn] & opponent_attack_mask == BitBoard::EMPTY
+            && BitBoard::QS_CASTLE_GAP[self.turn] & self.board.occupancy == BitBoard::EMPTY
+        {
+            moves.push(Move::QUEEN_SIDE_CASTLING[self.turn]);
+        }
+
+        if self
+            .castling_rights
+            .has(CastlingRights::KING_SIDE[self.turn])
+            && BitBoard::KS_CASTLE_PATH[self.turn] & opponent_attack_mask == BitBoard::EMPTY
+            && BitBoard::KS_CASTLE_GAP[self.turn] & self.board.occupancy == BitBoard::EMPTY
+        {
+            moves.push(Move::KING_SIDE_CASTLING[self.turn]);
+        }
     }
 }
