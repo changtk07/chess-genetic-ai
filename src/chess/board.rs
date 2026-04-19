@@ -259,6 +259,7 @@ pub(crate) struct BitBoard(u64);
 
 impl BitBoard {
     pub(crate) const EMPTY: Self = Self(0);
+    pub(crate) const FULL: Self = Self(!0);
 
     pub(crate) const QS_CASTLE_PATH: [Self; 2] =
         [Self(0x000000000000001C), Self(0x1C00000000000000)];
