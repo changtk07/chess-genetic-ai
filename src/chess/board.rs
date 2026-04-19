@@ -307,7 +307,7 @@ impl BitBoard {
         let mut i = 0;
         while i < 56 {
             let mut mask = 0u64;
-            let (rank, file) = (i / 8, i % 8);
+            let file = i % 8;
             mask |= if file < 7 { 1u64 << (i + 9) } else { 0 };
             mask |= if file > 0 { 1u64 << (i + 7) } else { 0 };
             white_masks[i] = BitBoard(mask);
@@ -317,7 +317,7 @@ impl BitBoard {
         let mut i = 63;
         while i > 7 {
             let mut mask = 0u64;
-            let (rank, file) = (i / 8, i % 8);
+            let file = i % 8;
             mask |= if file < 7 { 1u64 << (i - 7) } else { 0 };
             mask |= if file > 0 { 1u64 << (i - 9) } else { 0 };
             black_masks[i] = BitBoard(mask);
@@ -352,8 +352,8 @@ impl BitBoard {
             generate_ray(1, 0),   // East
             generate_ray(-1, 0),  // West
             generate_ray(1, 1),   // North East
-            generate_ray(-1, 1),  // South East
-            generate_ray(1, -1),  // North West
+            generate_ray(-1, 1),  // North West
+            generate_ray(1, -1),  // South East
             generate_ray(-1, -1), // South West
         ]
     };
@@ -444,22 +444,22 @@ impl BitBoard {
             north_east
         };
 
-        // South East (Index 5) - Negative direction, blocker is MSB
-        let south_east = Self::RAYS[5][position];
-        let south_east_blockers = south_east & occupancy;
-        mask |= if south_east_blockers.0 != 0 {
-            south_east ^ Self::RAYS[5][south_east_blockers.msb()]
-        } else {
-            south_east
-        };
-
-        // North West (Index 6) - Positive direction, blocker is LSB
-        let north_west = Self::RAYS[6][position];
+        // North West (Index 5) - Positive direction, blocker is LSB
+        let north_west = Self::RAYS[5][position];
         let north_west_blockers = north_west & occupancy;
         mask |= if north_west_blockers.0 != 0 {
-            north_west ^ Self::RAYS[6][north_west_blockers.lsb()]
+            north_west ^ Self::RAYS[5][north_west_blockers.lsb()]
         } else {
             north_west
+        };
+
+        // South East (Index 6) - Negative direction, blocker is MSB
+        let south_east = Self::RAYS[6][position];
+        let south_east_blockers = south_east & occupancy;
+        mask |= if south_east_blockers.0 != 0 {
+            south_east ^ Self::RAYS[6][south_east_blockers.msb()]
+        } else {
+            south_east
         };
 
         // South West (Index 7) - Negative direction, blocker is MSB
