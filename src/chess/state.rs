@@ -10,20 +10,6 @@ struct History {
     halfmove_clock: usize,
 }
 
-struct MoveGenMasks {
-    pin_rays: [BitBoard; 64],
-    check_mask: BitBoard,
-}
-
-impl MoveGenMasks {
-    const fn new() -> Self {
-        Self {
-            pin_rays: [BitBoard::FULL; 64],
-            check_mask: BitBoard::FULL,
-        }
-    }
-}
-
 pub struct State {
     board: Board,
     turn: Color,
@@ -32,7 +18,6 @@ pub struct State {
     fullmove_number: usize,
     halfmove_clock: usize,
     history: Vec<History>,
-    move_gen_masks: MoveGenMasks,
 }
 
 impl State {
@@ -45,7 +30,6 @@ impl State {
             fullmove_number: 1,
             halfmove_clock: 0,
             history: Vec::with_capacity(64),
-            move_gen_masks: MoveGenMasks::new(),
         }
     }
 
@@ -56,6 +40,7 @@ impl State {
     pub fn make_move(&mut self, mv: Move) {
         let (from, to, move_type) = mv.unwrap();
         let (moved, captured) = self.board.move_piece(from, to);
+        let move_gen_masks = self.board.move_gen_masks(self.turn);
 
         self.history.push(History {
             mv,
@@ -80,8 +65,6 @@ impl State {
         self.castling_rights = self.castling_rights.update(from, to);
         self.fullmove_number += self.turn as usize;
         self.turn = self.turn.flip();
-
-        // TODO: move_gen_mask update
     }
 
     pub fn unmake_move(&mut self) {
@@ -127,8 +110,6 @@ impl State {
             }
             _ => (),
         }
-
-        // TODO: move_gen_mask update
     }
 
     fn make_move_double_push(&mut self, from: Position, to: Position) {

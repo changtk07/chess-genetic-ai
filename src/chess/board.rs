@@ -257,6 +257,34 @@ impl Move {
     }
 }
 
+#[repr(u8)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub(crate) enum Direction {
+    North = 0,
+    South = 1,
+    East = 2,
+    West = 3,
+    NorthEast = 4,
+    NorthWest = 5,
+    SouthEast = 6,
+    SouthWest = 7,
+}
+
+impl<T> Index<Direction> for [T; 8] {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: Direction) -> &Self::Output {
+        &self[index as usize]
+    }
+}
+
+impl<T> IndexMut<Direction> for [T; 8] {
+    #[inline]
+    fn index_mut(&mut self, index: Direction) -> &mut Self::Output {
+        &mut self[index as usize]
+    }
+}
+
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) struct BitBoard(u64);
@@ -396,12 +424,60 @@ impl BitBoard {
         ]
     };
 
+    const BETWEEN_MASKS: [[Self; 64]; 64] = {
+        const fn set_bits_between(start: usize, end: usize, step: usize) -> BitBoard {
+            let mut mask = 0u64;
+            let mut i = start + step;
+            while i < end {
+                mask |= 1u64 << i;
+                i += step;
+            }
+            BitBoard(mask)
+        }
+
+        let mut masks = [[BitBoard::EMPTY; 64]; 64];
+
+        let mut i = 0;
+        while i < 64 {
+            let (rank_i, file_i) = (i as i8 / 8, i as i8 % 8);
+            let mut j = i + 1;
+            while j < 64 {
+                let (rank_j, file_j) = (j as i8 / 8, j as i8 % 8);
+                if rank_i == rank_j {
+                    let mask = set_bits_between(i, j, 1);
+                    masks[i][j] = mask;
+                    masks[j][i] = mask;
+                } else if file_i == file_j {
+                    let mask = set_bits_between(i, j, 8);
+                    masks[i][j] = mask;
+                    masks[j][i] = mask;
+                } else if rank_j - rank_i == file_j - file_i {
+                    let mask = set_bits_between(i, j, 9);
+                    masks[i][j] = mask;
+                    masks[j][i] = mask;
+                } else if rank_j - rank_i == file_i - file_j {
+                    let mask = set_bits_between(i, j, 7);
+                    masks[i][j] = mask;
+                    masks[j][i] = mask;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+
+        masks
+    };
+
     pub(crate) const fn is_empty(self, position: Position) -> bool {
         self.0 & position.mask().0 == 0
     }
 
     pub(crate) const fn is_not_empty(self, position: Position) -> bool {
         self.0 & position.mask().0 != 0
+    }
+
+    const fn has_only_one_set(self) -> bool {
+        self.0.is_power_of_two()
     }
 
     const fn set(self, position: Position) -> Self {
@@ -426,37 +502,37 @@ impl BitBoard {
         let mut mask = Self::EMPTY;
 
         // North (Index 0) - Positive direction, blocker is LSB
-        let north = Self::RAYS[0][position];
+        let north = Self::RAYS[Direction::North][position];
         let north_blockers = north & occupancy;
         mask |= if north_blockers.0 != 0 {
-            north ^ Self::RAYS[0][north_blockers.lsb()]
+            north ^ Self::RAYS[Direction::North][north_blockers.lsb()]
         } else {
             north
         };
 
         // South (Index 1) - Negative direction, blocker is MSB
-        let south = Self::RAYS[1][position];
+        let south = Self::RAYS[Direction::South][position];
         let south_blockers = south & occupancy;
         mask |= if south_blockers.0 != 0 {
-            south ^ Self::RAYS[1][south_blockers.msb()]
+            south ^ Self::RAYS[Direction::South][south_blockers.msb()]
         } else {
             south
         };
 
         // East (Index 2) - Positive direction, blocker is LSB
-        let east = Self::RAYS[2][position];
+        let east = Self::RAYS[Direction::East][position];
         let east_blockers = east & occupancy;
         mask |= if east_blockers.0 != 0 {
-            east ^ Self::RAYS[2][east_blockers.lsb()]
+            east ^ Self::RAYS[Direction::East][east_blockers.lsb()]
         } else {
             east
         };
 
         // West (Index 3) - Negative direction, blocker is MSB
-        let west = Self::RAYS[3][position];
+        let west = Self::RAYS[Direction::West][position];
         let west_blockers = west & occupancy;
         mask |= if west_blockers.0 != 0 {
-            west ^ Self::RAYS[3][west_blockers.msb()]
+            west ^ Self::RAYS[Direction::West][west_blockers.msb()]
         } else {
             west
         };
@@ -468,37 +544,37 @@ impl BitBoard {
         let mut mask = Self::EMPTY;
 
         // North East (Index 4) - Positive direction, blocker is LSB
-        let north_east = Self::RAYS[4][position];
+        let north_east = Self::RAYS[Direction::NorthEast][position];
         let north_east_blockers = north_east & occupancy;
         mask |= if north_east_blockers.0 != 0 {
-            north_east ^ Self::RAYS[4][north_east_blockers.lsb()]
+            north_east ^ Self::RAYS[Direction::NorthEast][north_east_blockers.lsb()]
         } else {
             north_east
         };
 
         // North West (Index 5) - Positive direction, blocker is LSB
-        let north_west = Self::RAYS[5][position];
+        let north_west = Self::RAYS[Direction::NorthWest][position];
         let north_west_blockers = north_west & occupancy;
         mask |= if north_west_blockers.0 != 0 {
-            north_west ^ Self::RAYS[5][north_west_blockers.lsb()]
+            north_west ^ Self::RAYS[Direction::NorthWest][north_west_blockers.lsb()]
         } else {
             north_west
         };
 
         // South East (Index 6) - Negative direction, blocker is MSB
-        let south_east = Self::RAYS[6][position];
+        let south_east = Self::RAYS[Direction::SouthEast][position];
         let south_east_blockers = south_east & occupancy;
         mask |= if south_east_blockers.0 != 0 {
-            south_east ^ Self::RAYS[6][south_east_blockers.msb()]
+            south_east ^ Self::RAYS[Direction::SouthEast][south_east_blockers.msb()]
         } else {
             south_east
         };
 
         // South West (Index 7) - Negative direction, blocker is MSB
-        let south_west = Self::RAYS[7][position];
+        let south_west = Self::RAYS[Direction::SouthWest][position];
         let south_west_blockers = south_west & occupancy;
         mask |= if south_west_blockers.0 != 0 {
-            south_west ^ Self::RAYS[7][south_west_blockers.msb()]
+            south_west ^ Self::RAYS[Direction::SouthWest][south_west_blockers.msb()]
         } else {
             south_west
         };
@@ -606,6 +682,26 @@ impl ShrAssign<u32> for BitBoard {
     #[inline]
     fn shr_assign(&mut self, rhs: u32) {
         self.0 >>= rhs;
+    }
+}
+
+pub(crate) struct MoveGenMasks {
+    pub(crate) pin_rays: [BitBoard; 64],
+    pub(crate) check_mask: BitBoard,
+    pub(crate) checker_count: u8,
+}
+
+impl MoveGenMasks {
+    const fn new() -> Self {
+        Self {
+            pin_rays: [BitBoard::FULL; 64],
+            check_mask: BitBoard::FULL,
+            checker_count: 0,
+        }
+    }
+
+    pub(crate) const fn is_double_check(&self) -> bool {
+        self.checker_count >= 2
     }
 }
 
@@ -741,6 +837,78 @@ impl Board {
             .fold(mask, |acc, attack| acc | attack);
 
         mask
+    }
+
+    pub(crate) fn move_gen_masks(&self, color: Color) -> MoveGenMasks {
+        let mut masks = MoveGenMasks::new();
+        let opponent = color.flip();
+        let king_position = self.pieces[Piece::king(color)].lsb();
+
+        let opponent_straight_slider =
+            self.pieces[Piece::rook(opponent)] | self.pieces[Piece::queen(opponent)];
+        let opponent_diagonal_slider =
+            self.pieces[Piece::bishop(opponent)] | self.pieces[Piece::queen(opponent)];
+
+        for (direction, sliders, is_positive_ray) in [
+            (Direction::North, opponent_straight_slider, true),
+            (Direction::South, opponent_straight_slider, false),
+            (Direction::East, opponent_straight_slider, true),
+            (Direction::West, opponent_straight_slider, false),
+            (Direction::NorthEast, opponent_diagonal_slider, true),
+            (Direction::NorthWest, opponent_diagonal_slider, true),
+            (Direction::SouthEast, opponent_diagonal_slider, false),
+            (Direction::SouthWest, opponent_diagonal_slider, false),
+        ] {
+            let attack_mask = BitBoard::RAYS[direction][king_position] & sliders;
+            if attack_mask == BitBoard::EMPTY {
+                continue;
+            }
+
+            let attacker_position = if is_positive_ray {
+                attack_mask.lsb()
+            } else {
+                attack_mask.msb()
+            };
+
+            let between_mask = BitBoard::BETWEEN_MASKS[attacker_position][king_position];
+            let blocker_mask = between_mask & self.occupancy;
+
+            if blocker_mask == BitBoard::EMPTY {
+                masks.check_mask &= between_mask | attacker_position.mask();
+                masks.checker_count += 1;
+                if masks.is_double_check() {
+                    return masks;
+                }
+                continue;
+            }
+
+            let friendly_blocker_mask = between_mask & self.colors[color];
+            if blocker_mask.has_only_one_set() && blocker_mask == friendly_blocker_mask {
+                masks.pin_rays[blocker_mask.lsb()] = between_mask | attacker_position.mask();
+            }
+        }
+
+        for attacker_position in
+            BitBoard::KNIGHT_ATTACK_MASKS[king_position] & self.pieces[Piece::knight(opponent)]
+        {
+            masks.check_mask &= attacker_position.mask();
+            masks.checker_count += 1;
+            if masks.is_double_check() {
+                return masks;
+            }
+        }
+
+        for attacker_position in
+            BitBoard::PAWN_ATTACK_MASKS[color][king_position] & self.pieces[Piece::pawn(opponent)]
+        {
+            masks.check_mask &= attacker_position.mask();
+            masks.checker_count += 1;
+            if masks.is_double_check() {
+                return masks;
+            }
+        }
+
+        masks
     }
 
     pub(crate) fn set_piece(&mut self, position: Position, piece: Piece) {
