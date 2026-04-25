@@ -33,6 +33,19 @@ impl State {
         }
     }
 
+    pub fn from_fen(fen: &str) -> Self {
+        let parts: ArrayVec<&str, 6> = fen.split(' ').collect();
+        Self {
+            board: Board::from_fen(parts[0]),
+            turn: Color::from_fen(parts[1]),
+            castling_rights: CastlingRights::from_fen(parts[2]),
+            en_passant: Position::from_fen(parts[3]),
+            halfmove_clock: parts[4].parse().unwrap(),
+            fullmove_number: parts[5].parse().unwrap(),
+            history: Vec::with_capacity(64),
+        }
+    }
+
     // ------------------------------------------------------------------------
     // Move Making
     // ------------------------------------------------------------------------

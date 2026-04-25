@@ -1,5 +1,7 @@
 use std::ops::*;
 
+use arrayvec::ArrayVec;
+
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Color {
@@ -8,6 +10,13 @@ pub(crate) enum Color {
 }
 
 impl Color {
+    pub(crate) fn from_fen(fen: &str) -> Self {
+        match fen {
+            "w" => Color::White,
+            _ => Color::Black,
+        }
+    }
+
     pub(crate) const fn flip(self) -> Self {
         unsafe { std::mem::transmute(1 - (self as u8)) }
     }
@@ -46,6 +55,24 @@ pub(crate) enum Piece {
 }
 
 impl Piece {
+    pub(crate) const fn from_fen(char: char) -> Option<Self> {
+        match char {
+            'P' => Some(Piece::WhitePawn),
+            'R' => Some(Piece::WhiteRook),
+            'N' => Some(Piece::WhiteKnight),
+            'B' => Some(Piece::WhiteBishop),
+            'Q' => Some(Piece::WhiteQueen),
+            'K' => Some(Piece::WhiteKing),
+            'p' => Some(Piece::BlackPawn),
+            'r' => Some(Piece::BlackRook),
+            'n' => Some(Piece::BlackKnight),
+            'b' => Some(Piece::BlackBishop),
+            'q' => Some(Piece::BlackQueen),
+            'k' => Some(Piece::BlackKing),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn pawn(color: Color) -> Self {
         unsafe { std::mem::transmute((color as u8) * 6) }
     }
@@ -132,6 +159,20 @@ impl Position {
     pub(crate) const KS_CASTLE_ROOK: [(Self, Self); 2] =
         [(Self::H1, Self::F1), (Self::H8, Self::F8)];
 
+    pub(crate) fn from_fen(fen: &str) -> Option<Self> {
+        if fen.len() != 2 {
+            return None;
+        }
+        let chars: ArrayVec<char, 2> = fen.chars().collect();
+        let file = chars[0] as u8 - b'a';
+        let rank = chars[1] as u8 - b'1';
+        if file >= 8 || rank >= 8 {
+            None
+        } else {
+            Some(Self(rank * 8 + file))
+        }
+    }
+
     pub(crate) const fn middle_of(a: Self, b: Self) -> Self {
         Self((a.0 + b.0) / 2)
     }
@@ -194,6 +235,18 @@ impl CastlingRights {
 
     pub(crate) const fn new() -> Self {
         Self(0b1111)
+    }
+
+    pub(crate) fn from_fen(fen: &str) -> Self {
+        let mut bits = 0u8;
+        fen.chars().for_each(|c| match c {
+            'K' => bits |= Self::KING_SIDE[Color::White].0,
+            'Q' => bits |= Self::QUEEN_SIDE[Color::White].0,
+            'k' => bits |= Self::KING_SIDE[Color::Black].0,
+            'q' => bits |= Self::QUEEN_SIDE[Color::Black].0,
+            _ => (),
+        });
+        Self(bits)
     }
 
     pub(crate) const fn has(self, right: Self) -> bool {
@@ -482,6 +535,10 @@ impl BitBoard {
 
     const fn has_only_one_set(self) -> bool {
         self.0.is_power_of_two()
+    }
+
+    const fn set_mut(&mut self, position: Position) {
+        self.0 |= position.mask().0
     }
 
     const fn set(self, position: Position) -> Self {
@@ -802,11 +859,54 @@ impl Board {
         }
     }
 
-    pub(crate) fn is_occupied(&self, position: Position) -> bool {
+    pub(crate) fn from_fen(fen: &str) -> Self {
+        let mut board = Self {
+            pieces: [BitBoard::EMPTY; 12],
+            colors: [BitBoard::EMPTY; 2],
+            occupancy: BitBoard::EMPTY,
+            mailbox: [None; 64],
+        };
+
+        fen.split('/').rev().enumerate().for_each(|(i, rank)| {
+            let mut file = 0u8;
+            rank.chars().for_each(|c| {
+                if c.is_ascii_digit() {
+                    file += c.to_digit(10).unwrap() as u8;
+                    return;
+                }
+
+                let p = Position((i * 8) as u8 + file);
+                let (piece, color) = match c {
+                    'P' => (Piece::WhitePawn, Color::White),
+                    'R' => (Piece::WhiteRook, Color::White),
+                    'N' => (Piece::WhiteKnight, Color::White),
+                    'B' => (Piece::WhiteBishop, Color::White),
+                    'Q' => (Piece::WhiteQueen, Color::White),
+                    'K' => (Piece::WhiteKing, Color::White),
+                    'p' => (Piece::BlackPawn, Color::Black),
+                    'r' => (Piece::BlackRook, Color::Black),
+                    'n' => (Piece::BlackKnight, Color::Black),
+                    'b' => (Piece::BlackBishop, Color::Black),
+                    'q' => (Piece::BlackQueen, Color::Black),
+                    'k' => (Piece::BlackKing, Color::Black),
+                    _ => return,
+                };
+                board.pieces[piece].set_mut(p);
+                board.colors[color].set_mut(p);
+                board.occupancy.set_mut(p);
+                board.mailbox[p] = Some(piece);
+                file += 1;
+            })
+        });
+
+        board
+    }
+
+    pub(crate) const fn is_occupied(&self, position: Position) -> bool {
         self.occupancy.is_not_empty(position)
     }
 
-    pub(crate) fn is_not_occupied(&self, position: Position) -> bool {
+    pub(crate) const fn is_not_occupied(&self, position: Position) -> bool {
         self.occupancy.is_empty(position)
     }
 
