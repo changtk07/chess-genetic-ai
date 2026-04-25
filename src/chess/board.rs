@@ -147,6 +147,10 @@ impl Position {
     pub(crate) const fn offset_unchecked(self, delta: i8) -> Self {
         Self((self.0 as i8 + delta) as u8)
     }
+
+    pub(crate) const fn rank(self) -> u8 {
+        self.0 / 8
+    }
 }
 
 impl<T> Index<Position> for [T; 64] {
@@ -170,10 +174,10 @@ pub(crate) struct CastlingRights(u8);
 
 impl CastlingRights {
     // Bit layout (4 bits total, LSB first):
-    //   Bit 0 (0b0001): Black queenside  — cleared when A8 rook or E8 king moves
-    //   Bit 1 (0b0010): Black kingside   — cleared when H8 rook or E8 king moves
-    //   Bit 2 (0b0100): White queenside  — cleared when A1 rook or E1 king moves
-    //   Bit 3 (0b1000): White kingside   — cleared when H1 rook or E1 king moves
+    //   Bit 0 (0b0001): Black queen side  — cleared when A8 rook or E8 king moves
+    //   Bit 1 (0b0010): Black king side   — cleared when H8 rook or E8 king moves
+    //   Bit 2 (0b0100): White queen side  — cleared when A1 rook or E1 king moves
+    //   Bit 3 (0b1000): White king side   — cleared when H1 rook or E1 king moves
     pub(crate) const QUEEN_SIDE: [Self; 2] = [Self(0b0100), Self(0b0001)];
     pub(crate) const KING_SIDE: [Self; 2] = [Self(0b1000), Self(0b0010)];
 
@@ -305,7 +309,7 @@ impl BitBoard {
     pub(crate) const KS_CASTLE_GAP: [Self; 2] =
         [Self(0x0000000000000060), Self(0x6000000000000000)];
 
-    pub(crate) const RANK_MASKS: [Self; 8] = [
+    pub(crate) const RANKS: [Self; 8] = [
         Self(0x00000000000000FF),
         Self(0x000000000000FF00),
         Self(0x0000000000FF0000),
@@ -392,7 +396,7 @@ impl BitBoard {
         [white_masks, black_masks]
     };
 
-    const RAYS: [[Self; 64]; 8] = {
+    pub(crate) const RAYS: [[Self; 64]; 8] = {
         const fn generate_ray(df: i8, dr: i8) -> [BitBoard; 64] {
             let mut masks = [BitBoard(0); 64];
             let mut i = 0;
@@ -424,7 +428,7 @@ impl BitBoard {
         ]
     };
 
-    const BETWEEN_MASKS: [[Self; 64]; 64] = {
+    pub(crate) const BETWEEN_MASKS: [[Self; 64]; 64] = {
         const fn set_bits_between(start: usize, end: usize, step: usize) -> BitBoard {
             let mut mask = 0u64;
             let mut i = start + step;
@@ -488,12 +492,12 @@ impl BitBoard {
         Self(self.0 & !position.mask().0)
     }
 
-    fn lsb(self) -> Position {
+    pub(crate) const fn lsb(self) -> Position {
         debug_assert!(self.0 != 0, "Called lsb() on an empty BitBoard");
         Position(self.0.trailing_zeros() as u8)
     }
 
-    fn msb(self) -> Position {
+    pub(crate) const fn msb(self) -> Position {
         debug_assert!(self.0 != 0, "Called msb() on an empty BitBoard");
         Position(63 - self.0.leading_zeros() as u8)
     }
@@ -688,7 +692,6 @@ impl ShrAssign<u32> for BitBoard {
 pub(crate) struct MoveGenMasks {
     pub(crate) pin_rays: [BitBoard; 64],
     pub(crate) check_mask: BitBoard,
-    pub(crate) checker_count: u8,
 }
 
 impl MoveGenMasks {
@@ -696,12 +699,11 @@ impl MoveGenMasks {
         Self {
             pin_rays: [BitBoard::FULL; 64],
             check_mask: BitBoard::FULL,
-            checker_count: 0,
         }
     }
 
     pub(crate) const fn is_double_check(&self) -> bool {
-        self.checker_count >= 2
+        self.check_mask.0 == 0
     }
 }
 
@@ -808,9 +810,9 @@ impl Board {
         self.occupancy.is_empty(position)
     }
 
-    pub(crate) fn color_attack_mask(&self, color: Color, ignroe: BitBoard) -> BitBoard {
+    pub(crate) fn color_attack_mask(&self, color: Color, ignore: BitBoard) -> BitBoard {
         let mut mask = BitBoard::EMPTY;
-        let occupancy_with_ignore = self.occupancy & !ignroe;
+        let occupancy_with_ignore = self.occupancy & !ignore;
 
         mask = self.pieces[Piece::pawn(color)]
             .map(|p| BitBoard::PAWN_ATTACK_MASKS[color][p])
@@ -875,7 +877,6 @@ impl Board {
 
             if blocker_mask == BitBoard::EMPTY {
                 masks.check_mask &= between_mask | attacker_position.mask();
-                masks.checker_count += 1;
                 if masks.is_double_check() {
                     return masks;
                 }
@@ -892,7 +893,6 @@ impl Board {
             BitBoard::KNIGHT_ATTACK_MASKS[king_position] & self.pieces[Piece::knight(opponent)]
         {
             masks.check_mask &= attacker_position.mask();
-            masks.checker_count += 1;
             if masks.is_double_check() {
                 return masks;
             }
@@ -902,7 +902,6 @@ impl Board {
             BitBoard::PAWN_ATTACK_MASKS[color][king_position] & self.pieces[Piece::pawn(opponent)]
         {
             masks.check_mask &= attacker_position.mask();
-            masks.checker_count += 1;
             if masks.is_double_check() {
                 return masks;
             }

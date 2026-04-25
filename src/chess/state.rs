@@ -40,7 +40,6 @@ impl State {
     pub fn make_move(&mut self, mv: Move) {
         let (from, to, move_type) = mv.unwrap();
         let (moved, captured) = self.board.move_piece(from, to);
-        let move_gen_masks = self.board.move_gen_masks(self.turn);
 
         self.history.push(History {
             mv,
@@ -178,32 +177,46 @@ impl State {
 
     pub fn generate_moves(&self) -> ArrayVec<Move, 256> {
         let mut moves = ArrayVec::<Move, 256>::new();
-        self.board.pieces[Piece::pawn(self.turn)]
-            .for_each(|position| self.generate_pawn_moves(position, &mut moves));
-        self.board.pieces[Piece::knight(self.turn)]
-            .for_each(|position| self.generate_knight_moves(position, &mut moves));
-        self.board.pieces[Piece::bishop(self.turn)]
-            .for_each(|position| self.generate_bishop_moves(position, &mut moves));
-        self.board.pieces[Piece::rook(self.turn)]
-            .for_each(|position| self.generate_rook_moves(position, &mut moves));
-        self.board.pieces[Piece::queen(self.turn)]
-            .for_each(|position| self.generate_queen_moves(position, &mut moves));
+        let masks = self.board.move_gen_masks(self.turn);
+
+        if !masks.is_double_check() {
+            self.board.pieces[Piece::pawn(self.turn)]
+                .for_each(|position| self.generate_pawn_moves(position, &masks, &mut moves));
+            self.board.pieces[Piece::knight(self.turn)]
+                .for_each(|position| self.generate_knight_moves(position, &masks, &mut moves));
+            self.board.pieces[Piece::bishop(self.turn)]
+                .for_each(|position| self.generate_bishop_moves(position, &masks, &mut moves));
+            self.board.pieces[Piece::rook(self.turn)]
+                .for_each(|position| self.generate_rook_moves(position, &masks, &mut moves));
+            self.board.pieces[Piece::queen(self.turn)]
+                .for_each(|position| self.generate_queen_moves(position, &masks, &mut moves));
+        }
+
         self.board.pieces[Piece::king(self.turn)]
             .for_each(|position| self.generate_king_moves(position, &mut moves));
-        // TODO: filter moves that leave king in check
+
         moves
     }
 
-    fn generate_pawn_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_pawn_moves(
+        &self,
+        position: Position,
+        masks: &MoveGenMasks,
+        moves: &mut ArrayVec<Move, 256>,
+    ) {
+        let legal_mask = masks.pin_rays[position] & masks.check_mask;
+
         'push: {
             let (forward_delta, start_rank_mask, end_rank_mask) = match self.turn {
-                Color::White => (8i8, BitBoard::RANK_MASKS[1], BitBoard::RANK_MASKS[7]),
-                Color::Black => (-8i8, BitBoard::RANK_MASKS[6], BitBoard::RANK_MASKS[0]),
+                Color::White => (8i8, BitBoard::RANKS[1], BitBoard::RANKS[7]),
+                Color::Black => (-8i8, BitBoard::RANKS[6], BitBoard::RANKS[0]),
             };
 
             let single_push_position = position.offset_unchecked(forward_delta);
 
-            if self.board.is_occupied(single_push_position) {
+            if self.board.is_occupied(single_push_position)
+                || legal_mask.is_empty(single_push_position)
+            {
                 break 'push;
             }
 
@@ -214,6 +227,7 @@ impl State {
                     Move::new(position, single_push_position, MoveType::PromotionBishop),
                     Move::new(position, single_push_position, MoveType::PromotionKnight),
                 ]);
+
                 break 'push;
             }
 
@@ -238,23 +252,21 @@ impl State {
 
         let attack_mask = BitBoard::PAWN_ATTACK_MASKS[self.turn][position];
 
-        if let Some(en_passant_position) = self.en_passant {
-            if en_passant_position.mask() & attack_mask != BitBoard::EMPTY {
-                moves.push(Move::new(
-                    position,
-                    en_passant_position,
-                    MoveType::EnPassant,
-                ));
+        if let Some(en_passant) = self.en_passant {
+            if attack_mask.is_not_empty(en_passant)
+                && self.is_en_passant_legal(position, en_passant, masks)
+            {
+                moves.push(Move::new(position, en_passant, MoveType::EnPassant));
             }
         }
 
         let opponent_mask = self.board.colors[self.turn.flip()];
         let end_rank_mask = match self.turn {
-            Color::White => BitBoard::RANK_MASKS[7],
-            Color::Black => BitBoard::RANK_MASKS[0],
+            Color::White => BitBoard::RANKS[7],
+            Color::Black => BitBoard::RANKS[0],
         };
 
-        (opponent_mask & attack_mask).for_each(|p| {
+        (attack_mask & opponent_mask & legal_mask).for_each(|p| {
             if end_rank_mask.is_not_empty(p) {
                 moves.extend([
                     Move::new(position, p, MoveType::PromotionQueen),
@@ -268,31 +280,55 @@ impl State {
         });
     }
 
-    fn generate_knight_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_knight_moves(
+        &self,
+        position: Position,
+        masks: &MoveGenMasks,
+        moves: &mut ArrayVec<Move, 256>,
+    ) {
+        let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = BitBoard::KNIGHT_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
-        (attack_mask & !friendly_mask)
+        (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
-    fn generate_bishop_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_bishop_moves(
+        &self,
+        position: Position,
+        masks: &MoveGenMasks,
+        moves: &mut ArrayVec<Move, 256>,
+    ) {
+        let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = BitBoard::bishop_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
-        (attack_mask & !friendly_mask)
+        (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
-    fn generate_rook_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_rook_moves(
+        &self,
+        position: Position,
+        masks: &MoveGenMasks,
+        moves: &mut ArrayVec<Move, 256>,
+    ) {
+        let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = BitBoard::rook_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
-        (attack_mask & !friendly_mask)
+        (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
-    fn generate_queen_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_queen_moves(
+        &self,
+        position: Position,
+        masks: &MoveGenMasks,
+        moves: &mut ArrayVec<Move, 256>,
+    ) {
+        let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = BitBoard::queen_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
-        (attack_mask & !friendly_mask)
+        (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
@@ -323,5 +359,50 @@ impl State {
         {
             moves.push(Move::KING_SIDE_CASTLING[self.turn]);
         }
+    }
+
+    fn is_en_passant_legal(
+        &self,
+        attacker: Position,
+        en_passant: Position,
+        masks: &MoveGenMasks,
+    ) -> bool {
+        if masks.pin_rays[attacker].is_empty(en_passant) {
+            return false;
+        }
+
+        let captured = Position::en_passant_captured(attacker, en_passant);
+
+        if masks.check_mask & (en_passant.mask() | captured.mask()) == BitBoard::EMPTY {
+            return false;
+        }
+
+        let king_pos = self.board.pieces[Piece::king(self.turn)].lsb();
+        if king_pos.rank() != attacker.rank() {
+            return true;
+        }
+
+        let opponent_sliders = self.board.pieces[Piece::rook(self.turn.flip())]
+            | self.board.pieces[Piece::queen(self.turn.flip())];
+
+        let occupancy_after = self.board.occupancy & !(attacker.mask() | captured.mask());
+
+        let west_attackers = BitBoard::RAYS[Direction::West][king_pos] & opponent_sliders;
+        if west_attackers != BitBoard::EMPTY {
+            let between = BitBoard::BETWEEN_MASKS[west_attackers.msb()][king_pos];
+            if between & occupancy_after == BitBoard::EMPTY {
+                return false;
+            }
+        }
+
+        let east_attackers = BitBoard::RAYS[Direction::East][king_pos] & opponent_sliders;
+        if east_attackers != BitBoard::EMPTY {
+            let between = BitBoard::BETWEEN_MASKS[east_attackers.lsb()][king_pos];
+            if between & occupancy_after == BitBoard::EMPTY {
+                return false;
+            }
+        }
+
+        true
     }
 }
