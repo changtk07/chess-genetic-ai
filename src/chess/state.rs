@@ -1,4 +1,7 @@
+use super::bitmask::*;
 use super::board::*;
+use super::moves::*;
+use super::types::*;
 use arrayvec::ArrayVec;
 
 #[derive(Clone)]
@@ -221,8 +224,8 @@ impl State {
 
         'push: {
             let (forward_delta, start_rank_mask, end_rank_mask) = match self.turn {
-                Color::White => (8i8, BitBoard::RANKS[1], BitBoard::RANKS[7]),
-                Color::Black => (-8i8, BitBoard::RANKS[6], BitBoard::RANKS[0]),
+                Color::White => (8i8, Bitmask::RANKS[1], Bitmask::RANKS[7]),
+                Color::Black => (-8i8, Bitmask::RANKS[6], Bitmask::RANKS[0]),
             };
 
             let single_push_position = position.offset_unchecked(forward_delta);
@@ -263,7 +266,7 @@ impl State {
             }
         }
 
-        let attack_mask = BitBoard::PAWN_ATTACK_MASKS[self.turn][position];
+        let attack_mask = Bitmask::PAWN_ATTACK_MASKS[self.turn][position];
 
         if let Some(en_passant) = self.en_passant {
             if attack_mask.is_not_empty(en_passant)
@@ -275,8 +278,8 @@ impl State {
 
         let opponent_mask = self.board.colors[self.turn.flip()];
         let end_rank_mask = match self.turn {
-            Color::White => BitBoard::RANKS[7],
-            Color::Black => BitBoard::RANKS[0],
+            Color::White => Bitmask::RANKS[7],
+            Color::Black => Bitmask::RANKS[0],
         };
 
         (attack_mask & opponent_mask & legal_mask).for_each(|p| {
@@ -300,7 +303,7 @@ impl State {
         moves: &mut ArrayVec<Move, 256>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
-        let attack_mask = BitBoard::KNIGHT_ATTACK_MASKS[position];
+        let attack_mask = Bitmask::KNIGHT_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
@@ -313,7 +316,7 @@ impl State {
         moves: &mut ArrayVec<Move, 256>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
-        let attack_mask = BitBoard::bishop_attack_mask(position, self.board.occupancy);
+        let attack_mask = Bitmask::bishop_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
@@ -326,7 +329,7 @@ impl State {
         moves: &mut ArrayVec<Move, 256>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
-        let attack_mask = BitBoard::rook_attack_mask(position, self.board.occupancy);
+        let attack_mask = Bitmask::rook_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
@@ -339,14 +342,14 @@ impl State {
         moves: &mut ArrayVec<Move, 256>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
-        let attack_mask = BitBoard::queen_attack_mask(position, self.board.occupancy);
+        let attack_mask = Bitmask::queen_attack_mask(position, self.board.occupancy);
         let friendly_mask = self.board.colors[self.turn];
         (attack_mask & !friendly_mask & legal_mask)
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
     fn generate_king_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
-        let attack_mask = BitBoard::KING_ATTACK_MASKS[position];
+        let attack_mask = Bitmask::KING_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
         let opponent_attack_mask = self
             .board
@@ -358,8 +361,8 @@ impl State {
         if self
             .castling_rights
             .has(CastlingRights::QUEEN_SIDE[self.turn])
-            && BitBoard::QS_CASTLE_PATH[self.turn] & opponent_attack_mask == BitBoard::EMPTY
-            && BitBoard::QS_CASTLE_GAP[self.turn] & self.board.occupancy == BitBoard::EMPTY
+            && Bitmask::QS_CASTLE_PATH[self.turn] & opponent_attack_mask == Bitmask::EMPTY
+            && Bitmask::QS_CASTLE_GAP[self.turn] & self.board.occupancy == Bitmask::EMPTY
         {
             moves.push(Move::QUEEN_SIDE_CASTLING[self.turn]);
         }
@@ -367,8 +370,8 @@ impl State {
         if self
             .castling_rights
             .has(CastlingRights::KING_SIDE[self.turn])
-            && BitBoard::KS_CASTLE_PATH[self.turn] & opponent_attack_mask == BitBoard::EMPTY
-            && BitBoard::KS_CASTLE_GAP[self.turn] & self.board.occupancy == BitBoard::EMPTY
+            && Bitmask::KS_CASTLE_PATH[self.turn] & opponent_attack_mask == Bitmask::EMPTY
+            && Bitmask::KS_CASTLE_GAP[self.turn] & self.board.occupancy == Bitmask::EMPTY
         {
             moves.push(Move::KING_SIDE_CASTLING[self.turn]);
         }
@@ -386,7 +389,7 @@ impl State {
 
         let captured = Position::en_passant_captured(attacker, en_passant);
 
-        if masks.check_mask & (en_passant.mask() | captured.mask()) == BitBoard::EMPTY {
+        if masks.check_mask & (en_passant.mask() | captured.mask()) == Bitmask::EMPTY {
             return false;
         }
 
@@ -400,18 +403,18 @@ impl State {
 
         let occupancy_after = self.board.occupancy & !(attacker.mask() | captured.mask());
 
-        let west_attackers = BitBoard::RAYS[Direction::West][king_pos] & opponent_sliders;
-        if west_attackers != BitBoard::EMPTY {
-            let between = BitBoard::BETWEEN_MASKS[west_attackers.msb()][king_pos];
-            if between & occupancy_after == BitBoard::EMPTY {
+        let west_attackers = Bitmask::RAYS[Direction::West][king_pos] & opponent_sliders;
+        if west_attackers != Bitmask::EMPTY {
+            let between = Bitmask::BETWEEN_MASKS[west_attackers.msb()][king_pos];
+            if between & occupancy_after == Bitmask::EMPTY {
                 return false;
             }
         }
 
-        let east_attackers = BitBoard::RAYS[Direction::East][king_pos] & opponent_sliders;
-        if east_attackers != BitBoard::EMPTY {
-            let between = BitBoard::BETWEEN_MASKS[east_attackers.lsb()][king_pos];
-            if between & occupancy_after == BitBoard::EMPTY {
+        let east_attackers = Bitmask::RAYS[Direction::East][king_pos] & opponent_sliders;
+        if east_attackers != Bitmask::EMPTY {
+            let between = Bitmask::BETWEEN_MASKS[east_attackers.lsb()][king_pos];
+            if between & occupancy_after == Bitmask::EMPTY {
                 return false;
             }
         }

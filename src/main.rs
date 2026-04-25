@@ -3,5 +3,5 @@ use chess::State;
 mod chess;
 
 fn main() {
-    let game = State::new();
+    let game = State::from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
