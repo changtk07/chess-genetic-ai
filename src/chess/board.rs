@@ -50,6 +50,34 @@ impl CastlingRights {
     }
 }
 
+impl std::fmt::Display for CastlingRights {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut builder = String::with_capacity(4);
+        if self.has(Self::KING_SIDE[Color::White]) {
+            builder.push('K');
+        }
+        if self.has(Self::QUEEN_SIDE[Color::White]) {
+            builder.push('Q');
+        }
+        if self.has(Self::KING_SIDE[Color::Black]) {
+            builder.push('k');
+        }
+        if self.has(Self::QUEEN_SIDE[Color::Black]) {
+            builder.push('q');
+        }
+        if builder.is_empty() {
+            builder.push('-');
+        }
+        write!(f, "{}", builder)
+    }
+}
+
+impl std::fmt::Debug for CastlingRights {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
 pub(crate) struct MoveGenMasks {
     pub(crate) pin_rays: [Bitmask; 64],
     pub(crate) check_mask: Bitmask,
@@ -362,5 +390,28 @@ impl Board {
             self.colors[from_idx.color() as usize].unset(from).set(to);
         self.occupancy = self.occupancy.unset(from).set(to);
         (Some(from_idx), captured)
+    }
+}
+
+impl std::fmt::Display for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for rank in (0..8).rev() {
+            write!(f, "{} ", rank + 1)?;
+            for file in 0..8 {
+                let idx = rank * 8 + file;
+                match self.mailbox[idx as usize] {
+                    Some(piece) => write!(f, " {}", piece)?,
+                    None => write!(f, " .")?,
+                };
+            }
+            writeln!(f, "")?;
+        }
+        writeln!(f, "   a b c d e f g h")
+    }
+}
+
+impl std::fmt::Debug for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }

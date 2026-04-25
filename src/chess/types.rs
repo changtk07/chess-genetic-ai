@@ -37,6 +37,22 @@ impl<T> IndexMut<Color> for [T; 2] {
     }
 }
 
+impl std::fmt::Display for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = match self {
+            Self::White => "White",
+            Self::Black => "Black",
+        };
+        write!(f, "{}", c)
+    }
+}
+
+impl std::fmt::Debug for Color {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) enum Piece {
@@ -100,6 +116,32 @@ impl<T> IndexMut<Piece> for [T; 12] {
     #[inline]
     fn index_mut(&mut self, index: Piece) -> &mut Self::Output {
         &mut self[index as usize]
+    }
+}
+
+impl std::fmt::Display for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let p = match self {
+            Self::WhitePawn => 'P',
+            Self::WhiteKnight => 'N',
+            Self::WhiteBishop => 'B',
+            Self::WhiteRook => 'R',
+            Self::WhiteQueen => 'Q',
+            Self::WhiteKing => 'K',
+            Self::BlackPawn => 'p',
+            Self::BlackKnight => 'n',
+            Self::BlackBishop => 'b',
+            Self::BlackRook => 'r',
+            Self::BlackQueen => 'q',
+            Self::BlackKing => 'k',
+        };
+        write!(f, "{}", p)
+    }
+}
+
+impl std::fmt::Debug for Piece {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -174,6 +216,19 @@ impl<T> IndexMut<Position> for [T; 64] {
     #[inline]
     fn index_mut(&mut self, index: Position) -> &mut Self::Output {
         &mut self[index.0 as usize]
+    }
+}
+
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (rank, file) = (self.0 / 8, self.0 % 8);
+        write!(f, "{}{}", (b'a' + file) as char, rank + 1)
+    }
+}
+
+impl std::fmt::Debug for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
 

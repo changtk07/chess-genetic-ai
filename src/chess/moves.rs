@@ -69,3 +69,23 @@ impl Move {
         MoveType::new(self.0 & 0x0F)
     }
 }
+
+impl std::fmt::Display for Move {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (from, to, mv_type) = self.unwrap();
+        write!(f, "{}{}", from, to)?;
+        match mv_type {
+            MoveType::PromotionQueen => write!(f, "=q"),
+            MoveType::PromotionRook => write!(f, "=r"),
+            MoveType::PromotionBishop => write!(f, "=b"),
+            MoveType::PromotionKnight => write!(f, "=n"),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl std::fmt::Debug for Move {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
+    }
+}

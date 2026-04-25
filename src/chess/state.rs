@@ -37,7 +37,7 @@ impl State {
     }
 
     pub fn from_fen(fen: &str) -> Self {
-        let parts: ArrayVec<&str, 6> = fen.split(' ').collect();
+        let parts: ArrayVec<&str, 6> = fen.split_whitespace().collect();
         Self {
             board: Board::from_fen(parts[0]),
             turn: Color::from_fen(parts[1]),
@@ -420,5 +420,25 @@ impl State {
         }
 
         true
+    }
+}
+
+impl std::fmt::Display for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.board)?;
+        writeln!(f, "Turn: {}", self.turn)?;
+        writeln!(f, "Castling: {}", self.castling_rights)?;
+        match self.en_passant {
+            Some(p) => writeln!(f, "En Passant: {}", p)?,
+            None => writeln!(f, "En Passant: -")?,
+        };
+        writeln!(f, "Halfmove Clock: {}", self.halfmove_clock)?;
+        writeln!(f, "Fullmove Number: {}", self.fullmove_number)
+    }
+}
+
+impl std::fmt::Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self)
     }
 }
