@@ -421,6 +421,48 @@ impl State {
 
         true
     }
+
+    // ------------------------------------------------------------------------
+    // Performance Testing
+    // ------------------------------------------------------------------------
+
+    pub fn perft(&mut self, depth: u8) -> u64 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut nodes = 0;
+        let moves = self.generate_moves();
+
+        for m in moves {
+            self.make_move(m);
+            nodes += self.perft(depth - 1);
+            self.unmake_move();
+        }
+
+        nodes
+    }
+
+    pub fn divide(&mut self, depth: u8) {
+        if depth == 0 {
+            return;
+        }
+
+        println!("--- Divide Depth {} ---", depth);
+        let mut total_nodes = 0;
+        let moves = self.generate_moves();
+
+        for m in moves {
+            self.make_move(m);
+            let nodes = self.perft(depth - 1);
+            self.unmake_move();
+
+            println!("{}: {}", m, nodes);
+            total_nodes += nodes;
+        }
+
+        println!("\nTotal nodes: {}", total_nodes);
+    }
 }
 
 impl std::fmt::Display for State {
