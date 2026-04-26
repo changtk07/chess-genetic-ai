@@ -230,33 +230,33 @@ impl State {
 
             let single_push_position = position.offset_unchecked(forward_delta);
 
-            if self.board.is_occupied(single_push_position)
-                || legal_mask.is_empty(single_push_position)
-            {
+            if self.board.is_occupied(single_push_position) {
                 break 'push;
             }
 
-            if end_rank_mask.is_not_empty(single_push_position) {
-                moves.extend([
-                    Move::new(position, single_push_position, MoveType::PromotionQueen),
-                    Move::new(position, single_push_position, MoveType::PromotionRook),
-                    Move::new(position, single_push_position, MoveType::PromotionBishop),
-                    Move::new(position, single_push_position, MoveType::PromotionKnight),
-                ]);
-
-                break 'push;
+            if legal_mask.is_not_empty(single_push_position) {
+                if end_rank_mask.is_not_empty(single_push_position) {
+                    moves.extend([
+                        Move::new(position, single_push_position, MoveType::PromotionQueen),
+                        Move::new(position, single_push_position, MoveType::PromotionRook),
+                        Move::new(position, single_push_position, MoveType::PromotionBishop),
+                        Move::new(position, single_push_position, MoveType::PromotionKnight),
+                    ]);
+                } else {
+                    moves.push(Move::new(
+                        position,
+                        single_push_position,
+                        MoveType::Standard,
+                    ));
+                }
             }
-
-            moves.push(Move::new(
-                position,
-                single_push_position,
-                MoveType::Standard,
-            ));
 
             if start_rank_mask.is_not_empty(position) {
                 let double_push_position = single_push_position.offset_unchecked(forward_delta);
 
-                if self.board.is_not_occupied(double_push_position) {
+                if self.board.is_not_occupied(double_push_position)
+                    && legal_mask.is_not_empty(double_push_position)
+                {
                     moves.push(Move::new(
                         position,
                         double_push_position,
