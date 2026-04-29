@@ -202,6 +202,10 @@ impl Position {
     pub(crate) const fn rank(self) -> u8 {
         self.0 / 8
     }
+
+    pub(crate) const fn file(self) -> u8 {
+        self.0 % 8
+    }
 }
 
 impl<T> Index<Position> for [T; 64] {

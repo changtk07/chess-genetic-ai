@@ -11,8 +11,12 @@ impl CastlingRights {
     //   Bit 1 (0b0010): Black king side   — cleared when H8 rook or E8 king moves
     //   Bit 2 (0b0100): White queen side  — cleared when A1 rook or E1 king moves
     //   Bit 3 (0b1000): White king side   — cleared when H1 rook or E1 king moves
-    pub(crate) const QUEEN_SIDE: [Self; 2] = [Self(0b0100), Self(0b0001)];
-    pub(crate) const KING_SIDE: [Self; 2] = [Self(0b1000), Self(0b0010)];
+    pub(crate) const WHITE_QUEEN_SIDE: Self = Self(0b0100);
+    pub(crate) const BLACK_QUEEN_SIDE: Self = Self(0b0001);
+    pub(crate) const QUEEN_SIDE: [Self; 2] = [Self::WHITE_QUEEN_SIDE, Self::BLACK_QUEEN_SIDE];
+    pub(crate) const WHITE_KING_SIDE: Self = Self(0b1000);
+    pub(crate) const BLACK_KING_SIDE: Self = Self(0b0010);
+    pub(crate) const KING_SIDE: [Self; 2] = [Self::WHITE_KING_SIDE, Self::BLACK_KING_SIDE];
 
     const MASKS: [u8; 64] = [
         11, 15, 15, 15, 3, 15, 15, 7, // 0-7
@@ -371,11 +375,11 @@ impl Board {
         from: Position,
         to: Position,
     ) -> (Option<Piece>, Option<Piece>) {
-        let Some(from_idx) = self.mailbox[from.0 as usize] else {
+        let Some(from_piece) = self.mailbox[from.0 as usize] else {
             return (None, None);
         };
 
-        let next_from_board = self.pieces[from_idx as usize].unset(from).set(to);
+        let next_from_board = self.pieces[from_piece as usize].unset(from).set(to);
 
         let captured = self.mailbox[to.0 as usize];
         if let Some(to_idx) = captured {
@@ -383,13 +387,13 @@ impl Board {
             self.colors[to_idx.color() as usize] = self.colors[to_idx.color() as usize].unset(to);
         }
 
-        self.pieces[from_idx as usize] = next_from_board;
-        self.mailbox[to.0 as usize] = Some(from_idx);
+        self.pieces[from_piece as usize] = next_from_board;
+        self.mailbox[to.0 as usize] = Some(from_piece);
         self.mailbox[from.0 as usize] = None;
-        self.colors[from_idx.color() as usize] =
-            self.colors[from_idx.color() as usize].unset(from).set(to);
+        self.colors[from_piece.color() as usize] =
+            self.colors[from_piece.color() as usize].unset(from).set(to);
         self.occupancy = self.occupancy.unset(from).set(to);
-        (Some(from_idx), captured)
+        (Some(from_piece), captured)
     }
 }
 

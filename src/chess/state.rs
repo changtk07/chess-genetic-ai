@@ -1,6 +1,7 @@
 use super::bitmask::*;
 use super::board::*;
 use super::moves::*;
+use super::prng::*;
 use super::types::*;
 use arrayvec::ArrayVec;
 
@@ -11,6 +12,7 @@ struct History {
     en_passant: Option<Position>,
     castling_rights: CastlingRights,
     halfmove_clock: usize,
+    hash: u64,
 }
 
 pub struct State {
@@ -20,33 +22,40 @@ pub struct State {
     castling_rights: CastlingRights,
     fullmove_number: usize,
     halfmove_clock: usize,
+    hash: u64,
     history: Vec<History>,
 }
 
 impl State {
     pub fn new() -> Self {
-        Self {
+        let mut state = Self {
             board: Board::new(),
             turn: Color::White,
             en_passant: None,
             castling_rights: CastlingRights::new(),
             fullmove_number: 1,
             halfmove_clock: 0,
+            hash: 0,
             history: Vec::with_capacity(64),
-        }
+        };
+        state.generate_hash();
+        state
     }
 
     pub fn from_fen(fen: &str) -> Self {
         let parts: ArrayVec<&str, 6> = fen.split_whitespace().collect();
-        Self {
+        let mut state = Self {
             board: Board::from_fen(parts[0]),
             turn: Color::from_fen(parts[1]),
             castling_rights: CastlingRights::from_fen(parts[2]),
             en_passant: Position::from_fen(parts[3]),
             halfmove_clock: parts[4].parse().unwrap(),
             fullmove_number: parts[5].parse().unwrap(),
+            hash: 0,
             history: Vec::with_capacity(64),
-        }
+        };
+        state.generate_hash();
+        state
     }
 
     // ------------------------------------------------------------------------
@@ -63,7 +72,15 @@ impl State {
             en_passant: self.en_passant,
             castling_rights: self.castling_rights,
             halfmove_clock: self.halfmove_clock,
+            hash: self.hash,
         });
+
+        // TODO: update hash
+        // 1. moved piece
+        // 2. captured piece
+        // 3. special move placement (promotion, castling)
+        // 4. en passant
+        // 5. castling rights
 
         match move_type {
             MoveType::DoublePush => self.make_move_double_push(from, to),
@@ -80,6 +97,7 @@ impl State {
         self.castling_rights = self.castling_rights.update(from, to);
         self.fullmove_number += self.turn as usize;
         self.turn = self.turn.flip();
+        self.hash ^= RAND_COLOR[Color::White] ^ RAND_COLOR[Color::Black];
     }
 
     pub fn unmake_move(&mut self) {
@@ -87,6 +105,7 @@ impl State {
             return;
         };
 
+        self.hash = history.hash;
         self.en_passant = history.en_passant;
         self.castling_rights = history.castling_rights;
         self.halfmove_clock = history.halfmove_clock;
@@ -420,6 +439,42 @@ impl State {
         }
 
         true
+    }
+
+    // ------------------------------------------------------------------------
+    // Zobrist Hashing
+    // ------------------------------------------------------------------------
+
+    fn generate_hash(&mut self) {
+        self.hash = 0;
+
+        self.board.mailbox.iter().enumerate().for_each(|(i, sqr)| {
+            if let Some(piece) = sqr {
+                self.hash ^= RAND_PLACEMENT[*piece][i];
+            };
+        });
+
+        if let Some(en_passant) = self.en_passant {
+            self.hash ^= RAND_EN_PASSANT[en_passant.file() as usize];
+        }
+
+        if self.castling_rights.has(CastlingRights::WHITE_QUEEN_SIDE) {
+            self.hash ^= RAND_CASTLING[0];
+        }
+
+        if self.castling_rights.has(CastlingRights::WHITE_KING_SIDE) {
+            self.hash ^= RAND_CASTLING[1];
+        }
+
+        if self.castling_rights.has(CastlingRights::BLACK_QUEEN_SIDE) {
+            self.hash ^= RAND_CASTLING[2];
+        }
+
+        if self.castling_rights.has(CastlingRights::BLACK_KING_SIDE) {
+            self.hash ^= RAND_CASTLING[3];
+        }
+
+        self.hash ^= RAND_COLOR[self.turn];
     }
 
     // ------------------------------------------------------------------------
