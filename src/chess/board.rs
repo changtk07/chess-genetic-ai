@@ -239,11 +239,7 @@ impl Board {
     }
 
     pub(crate) const fn is_occupied(&self, position: Position) -> bool {
-        self.occupancy.is_not_empty(position)
-    }
-
-    pub(crate) const fn is_not_occupied(&self, position: Position) -> bool {
-        self.occupancy.is_empty(position)
+        self.occupancy.contains(position)
     }
 
     pub(crate) fn color_attack_mask(&self, color: Color, ignore: Bitmask) -> Bitmask {

@@ -184,11 +184,7 @@ impl Bitmask {
         masks
     };
 
-    pub(crate) const fn is_empty(self, position: Position) -> bool {
-        self.0 & position.mask().0 == 0
-    }
-
-    pub(crate) const fn is_not_empty(self, position: Position) -> bool {
+    pub(crate) const fn contains(self, position: Position) -> bool {
         self.0 & position.mask().0 != 0
     }
 

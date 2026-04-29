@@ -53,7 +53,7 @@ impl Move {
         Self(mv)
     }
 
-    pub(crate) const fn unwrap(self) -> (Position, Position, MoveType) {
+    pub(crate) const fn unpack(self) -> (Position, Position, MoveType) {
         (self.from(), self.to(), self.move_type())
     }
 
@@ -72,7 +72,7 @@ impl Move {
 
 impl std::fmt::Display for Move {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (from, to, mv_type) = self.unwrap();
+        let (from, to, mv_type) = self.unpack();
         write!(f, "{}{}", from, to)?;
         match mv_type {
             MoveType::PromotionQueen => write!(f, "=q"),

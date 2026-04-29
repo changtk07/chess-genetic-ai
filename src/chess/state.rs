@@ -6,7 +6,7 @@ use super::types::*;
 use arrayvec::ArrayVec;
 
 #[derive(Clone)]
-struct History {
+struct UndoRecord {
     mv: Move,
     captured: Option<Piece>,
     en_passant: Option<Position>,
@@ -23,7 +23,7 @@ pub struct State {
     fullmove_number: usize,
     halfmove_clock: usize,
     hash: u64,
-    history: Vec<History>,
+    history: Vec<UndoRecord>,
 }
 
 impl State {
@@ -63,10 +63,10 @@ impl State {
     // ------------------------------------------------------------------------
 
     pub fn make_move(&mut self, mv: Move) {
-        let (from, to, move_type) = mv.unwrap();
+        let (from, to, move_type) = mv.unpack();
         let (moved, captured) = self.board.move_piece(from, to);
 
-        self.history.push(History {
+        self.history.push(UndoRecord {
             mv,
             captured,
             en_passant: self.en_passant,
@@ -253,8 +253,8 @@ impl State {
                 break 'push;
             }
 
-            if legal_mask.is_not_empty(single_push_position) {
-                if end_rank_mask.is_not_empty(single_push_position) {
+            if legal_mask.contains(single_push_position) {
+                if end_rank_mask.contains(single_push_position) {
                     moves.extend([
                         Move::new(position, single_push_position, MoveType::PromotionQueen),
                         Move::new(position, single_push_position, MoveType::PromotionRook),
@@ -270,11 +270,11 @@ impl State {
                 }
             }
 
-            if start_rank_mask.is_not_empty(position) {
+            if start_rank_mask.contains(position) {
                 let double_push_position = single_push_position.offset_unchecked(forward_delta);
 
-                if self.board.is_not_occupied(double_push_position)
-                    && legal_mask.is_not_empty(double_push_position)
+                if !self.board.is_occupied(double_push_position)
+                    && legal_mask.contains(double_push_position)
                 {
                     moves.push(Move::new(
                         position,
@@ -288,7 +288,7 @@ impl State {
         let attack_mask = Bitmask::PAWN_ATTACK_MASKS[self.turn][position];
 
         if let Some(en_passant) = self.en_passant {
-            if attack_mask.is_not_empty(en_passant)
+            if attack_mask.contains(en_passant)
                 && self.is_en_passant_legal(position, en_passant, masks)
             {
                 moves.push(Move::new(position, en_passant, MoveType::EnPassant));
@@ -302,7 +302,7 @@ impl State {
         };
 
         (attack_mask & opponent_mask & legal_mask).for_each(|p| {
-            if end_rank_mask.is_not_empty(p) {
+            if end_rank_mask.contains(p) {
                 moves.extend([
                     Move::new(position, p, MoveType::PromotionQueen),
                     Move::new(position, p, MoveType::PromotionRook),
@@ -402,7 +402,7 @@ impl State {
         en_passant: Position,
         masks: &MoveGenMasks,
     ) -> bool {
-        if masks.pin_rays[attacker].is_empty(en_passant) {
+        if !masks.pin_rays[attacker].contains(en_passant) {
             return false;
         }
 
