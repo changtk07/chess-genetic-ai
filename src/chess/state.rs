@@ -546,3 +546,38 @@ impl std::fmt::Debug for State {
         write!(f, "{}", self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn perft_depth_1() {
+        let mut state = State::new();
+        assert_eq!(state.perft(1), 20);
+    }
+
+    #[test]
+    fn perft_depth_2() {
+        let mut state = State::new();
+        assert_eq!(state.perft(2), 400);
+    }
+
+    #[test]
+    fn perft_depth_3() {
+        let mut state = State::new();
+        assert_eq!(state.perft(3), 8_902);
+    }
+
+    #[test]
+    fn perft_depth_4() {
+        let mut state = State::new();
+        assert_eq!(state.perft(4), 197_281);
+    }
+
+    #[test]
+    fn perft_depth_5() {
+        let mut state = State::new();
+        assert_eq!(state.perft(5), 4_865_609);
+    }
+}
