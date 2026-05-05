@@ -75,12 +75,17 @@ impl State {
             hash: self.hash,
         });
 
-        // TODO: update hash
-        // 1. moved piece
-        // 2. captured piece
-        // 3. special move placement (promotion, castling)
-        // 4. en passant
-        // 5. castling rights
+        if let Some(piece) = moved {
+            self.hash ^= RAND_PLACEMENT[piece][from];
+            self.hash ^= RAND_PLACEMENT[piece][to];
+        }
+        if let Some(piece) = captured {
+            self.hash ^= RAND_PLACEMENT[piece][to];
+        }
+        if let Some(pos) = self.en_passant {
+            self.hash ^= RAND_EN_PASSANT[pos.file() as usize];
+        }
+        self.hash ^= RAND_CASTLING[self.castling_rights];
 
         match move_type {
             MoveType::DoublePush => self.make_move_double_push(from, to),
@@ -97,7 +102,9 @@ impl State {
         self.castling_rights = self.castling_rights.update(from, to);
         self.fullmove_number += self.turn as usize;
         self.turn = self.turn.flip();
-        self.hash ^= RAND_COLOR[Color::White] ^ RAND_COLOR[Color::Black];
+        self.hash ^= RAND_COLOR[Color::White];
+        self.hash ^= RAND_COLOR[Color::Black];
+        self.hash ^= RAND_CASTLING[self.castling_rights];
     }
 
     pub fn unmake_move(&mut self) {
@@ -147,8 +154,10 @@ impl State {
     }
 
     fn make_move_double_push(&mut self, from: Position, to: Position) {
-        self.en_passant = Some(Position::middle_of(from, to));
+        let en_passant = Position::middle_of(from, to);
+        self.en_passant = Some(en_passant);
         self.halfmove_clock = 0;
+        self.hash ^= RAND_EN_PASSANT[en_passant.file() as usize];
     }
 
     fn make_move_en_passant(&mut self, from: Position, to: Position) {
@@ -156,30 +165,39 @@ impl State {
         self.board.unset_piece(captured);
         self.en_passant = None;
         self.halfmove_clock = 0;
+        self.hash ^= RAND_PLACEMENT[Piece::pawn(self.turn.flip())][captured];
     }
 
     fn make_move_promotion_rook(&mut self, to: Position) {
         self.board.set_piece(to, Piece::rook(self.turn));
         self.en_passant = None;
         self.halfmove_clock = 0;
+        self.hash ^= RAND_PLACEMENT[Piece::pawn(self.turn)][to];
+        self.hash ^= RAND_PLACEMENT[Piece::rook(self.turn)][to];
     }
 
     fn make_move_promotion_knight(&mut self, to: Position) {
         self.board.set_piece(to, Piece::knight(self.turn));
         self.en_passant = None;
         self.halfmove_clock = 0;
+        self.hash ^= RAND_PLACEMENT[Piece::pawn(self.turn)][to];
+        self.hash ^= RAND_PLACEMENT[Piece::knight(self.turn)][to];
     }
 
     fn make_move_promotion_bishop(&mut self, to: Position) {
         self.board.set_piece(to, Piece::bishop(self.turn));
         self.en_passant = None;
         self.halfmove_clock = 0;
+        self.hash ^= RAND_PLACEMENT[Piece::pawn(self.turn)][to];
+        self.hash ^= RAND_PLACEMENT[Piece::bishop(self.turn)][to];
     }
 
     fn make_move_promotion_queen(&mut self, to: Position) {
         self.board.set_piece(to, Piece::queen(self.turn));
         self.en_passant = None;
         self.halfmove_clock = 0;
+        self.hash ^= RAND_PLACEMENT[Piece::pawn(self.turn)][to];
+        self.hash ^= RAND_PLACEMENT[Piece::queen(self.turn)][to];
     }
 
     fn make_move_king_side_castling(&mut self) {
@@ -187,6 +205,8 @@ impl State {
         self.board.move_piece(rook_from, rook_to);
         self.en_passant = None;
         self.halfmove_clock += 1;
+        self.hash ^= RAND_PLACEMENT[Piece::rook(self.turn)][rook_from];
+        self.hash ^= RAND_PLACEMENT[Piece::rook(self.turn)][rook_to];
     }
 
     fn make_move_queen_side_castling(&mut self) {
@@ -194,6 +214,8 @@ impl State {
         self.board.move_piece(rook_from, rook_to);
         self.en_passant = None;
         self.halfmove_clock += 1;
+        self.hash ^= RAND_PLACEMENT[Piece::rook(self.turn)][rook_from];
+        self.hash ^= RAND_PLACEMENT[Piece::rook(self.turn)][rook_to];
     }
 
     fn make_move_standard(&mut self, moved: Option<Piece>, captured: Option<Piece>) {
@@ -458,22 +480,7 @@ impl State {
             self.hash ^= RAND_EN_PASSANT[en_passant.file() as usize];
         }
 
-        if self.castling_rights.has(CastlingRights::WHITE_QUEEN_SIDE) {
-            self.hash ^= RAND_CASTLING[0];
-        }
-
-        if self.castling_rights.has(CastlingRights::WHITE_KING_SIDE) {
-            self.hash ^= RAND_CASTLING[1];
-        }
-
-        if self.castling_rights.has(CastlingRights::BLACK_QUEEN_SIDE) {
-            self.hash ^= RAND_CASTLING[2];
-        }
-
-        if self.castling_rights.has(CastlingRights::BLACK_KING_SIDE) {
-            self.hash ^= RAND_CASTLING[3];
-        }
-
+        self.hash ^= RAND_CASTLING[self.castling_rights];
         self.hash ^= RAND_COLOR[self.turn];
     }
 

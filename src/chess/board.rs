@@ -1,5 +1,6 @@
 use super::bitmask::Bitmask;
 use super::types::*;
+use std::ops::{Index, IndexMut};
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -51,6 +52,21 @@ impl CastlingRights {
 
     pub(crate) fn update(self, from: Position, to: Position) -> Self {
         Self(self.0 & Self::MASKS[from.0 as usize] & Self::MASKS[to.0 as usize])
+    }
+}
+
+impl<T> Index<CastlingRights> for [T; 16] {
+    type Output = T;
+    #[inline]
+    fn index(&self, index: CastlingRights) -> &Self::Output {
+        &self[index.0 as usize]
+    }
+}
+
+impl<T> IndexMut<CastlingRights> for [T; 16] {
+    #[inline]
+    fn index_mut(&mut self, index: CastlingRights) -> &mut Self::Output {
+        &mut self[index.0 as usize]
     }
 }
 

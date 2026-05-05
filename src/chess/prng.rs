@@ -43,9 +43,9 @@ pub(crate) const RAND_EN_PASSANT: [u64; 8] = {
     prng.next_n::<8>()
 };
 
-pub(crate) const RAND_CASTLING: [u64; 4] = {
+pub(crate) const RAND_CASTLING: [u64; 16] = {
     let mut prng = PRNG::new(0xd20f9fc3b45ed697);
-    prng.next_n::<4>()
+    prng.next_n::<16>()
 };
 
 pub(crate) const RAND_COLOR: [u64; 2] = {
