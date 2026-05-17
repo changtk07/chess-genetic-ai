@@ -3,15 +3,65 @@ use burn::{
     module::{Module, Param},
     nn::{
         attention::{MhaInput, MultiHeadAttention, MultiHeadAttentionConfig},
-        Linear, LinearConfig, RmsNorm, RmsNormConfig,
+        Embedding, EmbeddingConfig, Linear, LinearConfig, RmsNorm, RmsNormConfig,
     },
     tensor::{
         activation::{gelu, softmax, tanh},
         backend::Backend,
-        Distribution,
+        Distribution, TensorData,
     },
     Tensor,
 };
+
+use crate::chess::State;
+
+#[derive(Module, Debug)]
+struct ChessEmbedding<B: Backend> {
+    e_piece: Embedding<B>,
+    e_pos: Embedding<B>,
+}
+
+impl<B: Backend> ChessEmbedding<B> {
+    fn forward(&self, states: &[&State], device: &B::Device) -> Tensor<B, 3> {
+        let piece_data: Vec<i32> = states
+            .iter()
+            .flat_map(|state| {
+                state.board.mailbox.iter().map(|sqr| match sqr {
+                    Some(piece) => *piece as i32 + 1,
+                    None => 0,
+                })
+            })
+            .collect();
+        let batch_size = states.len();
+        let piece_input = Tensor::from_data(TensorData::new(piece_data, [batch_size, 64]), device);
+
+        let pos_data: Vec<i32> = (0..64).collect();
+        let pos_input = Tensor::from_data(TensorData::new(pos_data, [1, 64]), device);
+
+        let encoded_piece = self.e_piece.forward(piece_input);
+        let encoded_pos = self.e_pos.forward(pos_input);
+        let encoded = encoded_piece + encoded_pos;
+
+        // TODO: [CLS] token
+
+        encoded
+    }
+}
+
+#[derive(Config, Debug)]
+struct ChessEmbeddingConfig {
+    #[config(default = 384)]
+    d_model: usize,
+}
+
+impl ChessEmbeddingConfig {
+    fn init<B: Backend>(&self, device: &B::Device) -> ChessEmbedding<B> {
+        ChessEmbedding {
+            e_piece: EmbeddingConfig::new(13, self.d_model).init(device),
+            e_pos: EmbeddingConfig::new(64, self.d_model).init(device),
+        }
+    }
+}
 
 #[derive(Module, Debug)]
 struct AttentionBlock<B: Backend> {
@@ -143,7 +193,7 @@ impl ValueHeadConfig {
 
 #[derive(Module, Debug)]
 pub(crate) struct TransformerModel<B: Backend> {
-    // TODO: embedding layers
+    embedding: ChessEmbedding<B>,
     attention_blocks: Vec<AttentionBlock<B>>,
     policy_head: PolicyHead<B>,
     value_head: ValueHead<B>,
@@ -152,16 +202,18 @@ pub(crate) struct TransformerModel<B: Backend> {
 impl<B: Backend> TransformerModel<B> {
     pub(crate) const HEAD_DIMENSION: usize = 64;
 
-    // [batch_size, 65, d_model]
     pub(crate) fn forward(
         &self,
-        input: Tensor<B, 3>,
+        states: &[&State],
         legal_mask: Tensor<B, 2>,
+        device: &B::Device,
     ) -> (Tensor<B, 2>, Tensor<B, 2>) {
+        let attn_input = self.embedding.forward(states, device);
+
         let attn_output = self
             .attention_blocks
             .iter()
-            .fold(input, |x, block| block.forward(x));
+            .fold(attn_input, |x, block| block.forward(x));
 
         let seq_len = attn_output.dims()[1];
         let x = attn_output.narrow(1, 1, seq_len - 1);
@@ -188,6 +240,9 @@ impl TransformerModelConfig {
         let d_ff = (self.d_ff_scale * d_model as f64) as usize;
 
         TransformerModel {
+            embedding: ChessEmbeddingConfig::new()
+                .with_d_model(d_model)
+                .init(device),
             attention_blocks: (0..self.n_blocks)
                 .map(|_| {
                     AttentionBlockConfig::new()

@@ -16,12 +16,12 @@ struct UndoRecord {
 }
 
 pub struct State {
-    board: Board,
-    turn: Color,
-    en_passant: Option<Position>,
-    castling_rights: CastlingRights,
-    fullmove_number: usize,
-    halfmove_clock: usize,
+    pub(crate) board: Board,
+    pub(crate) turn: Color,
+    pub(crate) en_passant: Option<Position>,
+    pub(crate) castling_rights: CastlingRights,
+    pub(crate) fullmove_number: usize,
+    pub(crate) halfmove_clock: usize,
     hash: u64,
     history: Vec<UndoRecord>,
 }
