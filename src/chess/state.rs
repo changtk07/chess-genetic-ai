@@ -1,5 +1,3 @@
-use arrayvec::ArrayVec;
-
 use crate::chess::{
     bitmask::Bitmask,
     board::{Board, CastlingRights, MoveGenMasks},
@@ -7,6 +5,7 @@ use crate::chess::{
     prng::{RAND_CASTLING, RAND_COLOR, RAND_EN_PASSANT, RAND_PLACEMENT},
     types::{Color, Direction, Piece, Position},
 };
+use arrayvec::ArrayVec;
 
 #[derive(Clone)]
 struct UndoRecord {
@@ -235,8 +234,8 @@ impl State {
     // Move Generation
     // ------------------------------------------------------------------------
 
-    pub fn generate_moves(&self) -> ArrayVec<Move, 256> {
-        let mut moves = ArrayVec::<Move, 256>::new();
+    pub fn generate_moves(&self) -> ArrayVec<Move, 218> {
+        let mut moves = ArrayVec::<Move, 218>::new();
         let masks = self.board.move_gen_masks(self.turn);
 
         if !masks.is_double_check() {
@@ -262,7 +261,7 @@ impl State {
         &self,
         position: Position,
         masks: &MoveGenMasks,
-        moves: &mut ArrayVec<Move, 256>,
+        moves: &mut ArrayVec<Move, 218>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
 
@@ -344,7 +343,7 @@ impl State {
         &self,
         position: Position,
         masks: &MoveGenMasks,
-        moves: &mut ArrayVec<Move, 256>,
+        moves: &mut ArrayVec<Move, 218>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = Bitmask::KNIGHT_ATTACK_MASKS[position];
@@ -357,7 +356,7 @@ impl State {
         &self,
         position: Position,
         masks: &MoveGenMasks,
-        moves: &mut ArrayVec<Move, 256>,
+        moves: &mut ArrayVec<Move, 218>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = Bitmask::bishop_attack_mask(position, self.board.occupancy);
@@ -370,7 +369,7 @@ impl State {
         &self,
         position: Position,
         masks: &MoveGenMasks,
-        moves: &mut ArrayVec<Move, 256>,
+        moves: &mut ArrayVec<Move, 218>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = Bitmask::rook_attack_mask(position, self.board.occupancy);
@@ -383,7 +382,7 @@ impl State {
         &self,
         position: Position,
         masks: &MoveGenMasks,
-        moves: &mut ArrayVec<Move, 256>,
+        moves: &mut ArrayVec<Move, 218>,
     ) {
         let legal_mask = masks.pin_rays[position] & masks.check_mask;
         let attack_mask = Bitmask::queen_attack_mask(position, self.board.occupancy);
@@ -392,7 +391,7 @@ impl State {
             .for_each(|p| moves.push(Move::new(position, p, MoveType::Standard)));
     }
 
-    fn generate_king_moves(&self, position: Position, moves: &mut ArrayVec<Move, 256>) {
+    fn generate_king_moves(&self, position: Position, moves: &mut ArrayVec<Move, 218>) {
         let attack_mask = Bitmask::KING_ATTACK_MASKS[position];
         let friendly_mask = self.board.colors[self.turn];
         let opponent_attack_mask = self
@@ -474,8 +473,8 @@ impl State {
         self.hash = 0;
 
         self.board.mailbox.iter().enumerate().for_each(|(i, sqr)| {
-            if let Some(piece) = sqr {
-                self.hash ^= RAND_PLACEMENT[*piece][i];
+            if let Some(piece) = *sqr {
+                self.hash ^= RAND_PLACEMENT[piece][i];
             };
         });
 

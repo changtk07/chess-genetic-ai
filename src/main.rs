@@ -1,7 +1,7 @@
 mod chess;
 mod engine;
 
-use chess::State;
+use crate::chess::State;
 
 fn main() {
     let mut state = State::new();

@@ -1,6 +1,7 @@
+use crate::chess::{board::CastlingRights, State};
 use burn::{
     config::Config,
-    module::{Module, Param},
+    module::Module,
     nn::{
         attention::{MhaInput, MultiHeadAttention, MultiHeadAttentionConfig},
         Embedding, EmbeddingConfig, Linear, LinearConfig, RmsNorm, RmsNormConfig,
@@ -8,12 +9,10 @@ use burn::{
     tensor::{
         activation::{gelu, softmax, tanh},
         backend::Backend,
-        Distribution, TensorData,
+        TensorData,
     },
     Tensor,
 };
-
-use crate::chess::{board::CastlingRights, State};
 
 #[derive(Module, Debug)]
 struct ChessEmbedding<B: Backend> {
@@ -37,7 +36,7 @@ impl<B: Backend> ChessEmbedding<B> {
 
         let mut metadata = Vec::with_capacity(batch_size * 15);
         metadata.extend(states.iter().flat_map(|state| {
-            let ep_idx = state.en_passant.map_or(0, |ep| ep.file() as usize + 1);
+            let en_passant_idx = state.en_passant.map_or(0, |ep| ep.file() + 1);
             [(state.turn as i8 * -2 + 1) as f32]
                 .into_iter()
                 .chain(
@@ -50,12 +49,12 @@ impl<B: Backend> ChessEmbedding<B> {
                     .map(|r| state.castling_rights.has(r) as i8 as f32),
                 )
                 // One-hot en passant file: index 0 = none, 1..=8 = files a..h
-                .chain((0..9).map(move |i| (i == ep_idx) as i8 as f32))
+                .chain((0..9).map(move |i| (i == en_passant_idx) as i8 as f32))
                 .chain([state.halfmove_clock as f32 / 100.0])
         }));
 
         let piece_input = Tensor::from_data(TensorData::new(piece_data, [batch_size, 64]), device);
-        let pos_input = Tensor::from_data(TensorData::new((0..64).collect(), [1, 64]), device);
+        let pos_input = Tensor::from_data(TensorData::new((0i32..64).collect(), [1, 64]), device);
         let metadata_input: Tensor<B, 2> =
             Tensor::from_data(TensorData::new(metadata, [batch_size, 15]), device);
 
@@ -161,28 +160,14 @@ impl PolicyHeadConfig {
 
 #[derive(Module, Debug)]
 struct ValueHead<B: Backend> {
-    query: Param<Tensor<B, 3>>,
-    keys: Linear<B>,
-    values: Linear<B>,
     ff1: Linear<B>,
     ff2: Linear<B>,
 }
 
 impl<B: Backend> ValueHead<B> {
-    // [batch_size, 64, d_model]
-    fn forward(&self, input: Tensor<B, 3>) -> Tensor<B, 2> {
-        let batch_size = input.dims()[0] as i64;
-        let d_model = input.dims()[2] as f64;
-
-        let query = self.query.val().expand([batch_size, -1, -1]);
-        let keys = self.keys.forward(input.clone()).swap_dims(1, 2);
-        let values = self.values.forward(input);
-
-        let scores = query.matmul(keys) / d_model.sqrt();
-        let weights = softmax(scores, 2);
-
-        let x = weights.matmul(values).squeeze_dim(1);
-        let x = self.ff1.forward(x);
+    // [batch_size, d_model] — CLS token
+    fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
+        let x = self.ff1.forward(input);
         let x = gelu(x);
         let x = self.ff2.forward(x);
         tanh(x)
@@ -198,13 +183,6 @@ struct ValueHeadConfig {
 impl ValueHeadConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> ValueHead<B> {
         ValueHead {
-            query: Param::from_tensor(Tensor::random(
-                [1, 1, self.d_model],
-                Distribution::Normal(0.0, (1.0 / self.d_model as f64).sqrt()),
-                device,
-            )),
-            keys: LinearConfig::new(self.d_model, self.d_model).init(device),
-            values: LinearConfig::new(self.d_model, self.d_model).init(device),
             ff1: LinearConfig::new(self.d_model, self.d_model).init(device),
             ff2: LinearConfig::new(self.d_model, 1).init(device),
         }
@@ -236,9 +214,11 @@ impl<B: Backend> TransformerModel<B> {
             .fold(attn_input, |x, block| block.forward(x));
 
         let seq_len = attn_output.dims()[1];
-        let x = attn_output.narrow(1, 1, seq_len - 1);
-        let policy = self.policy_head.forward(x.clone(), legal_mask);
-        let value = self.value_head.forward(x);
+        let cls_token = attn_output.clone().narrow(1, 0, 1).squeeze_dim(1); // [B, d_model]
+        let squares = attn_output.narrow(1, 1, seq_len - 1); // [B, 64, d_model]
+
+        let policy = self.policy_head.forward(squares, legal_mask);
+        let value = self.value_head.forward(cls_token);
 
         (policy, value)
     }

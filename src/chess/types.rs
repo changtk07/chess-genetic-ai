@@ -1,4 +1,4 @@
-use super::bitmask::Bitmask;
+use crate::chess::bitmask::Bitmask;
 use arrayvec::ArrayVec;
 use std::ops::{Index, IndexMut};
 

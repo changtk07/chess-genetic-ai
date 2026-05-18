@@ -1,4 +1,4 @@
-use super::types::Position;
+use crate::chess::types::Position;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]

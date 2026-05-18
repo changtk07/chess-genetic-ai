@@ -1,5 +1,7 @@
-use super::bitmask::Bitmask;
-use super::types::*;
+use crate::chess::{
+    bitmask::Bitmask,
+    types::{Color, Direction, Piece, Position},
+};
 use std::ops::{Index, IndexMut};
 
 #[repr(transparent)]
@@ -37,10 +39,10 @@ impl CastlingRights {
     pub(crate) fn from_fen(fen: &str) -> Self {
         let mut bits = 0u8;
         fen.chars().for_each(|c| match c {
-            'K' => bits |= Self::KING_SIDE[Color::White as usize].0,
-            'Q' => bits |= Self::QUEEN_SIDE[Color::White as usize].0,
-            'k' => bits |= Self::KING_SIDE[Color::Black as usize].0,
-            'q' => bits |= Self::QUEEN_SIDE[Color::Black as usize].0,
+            'K' => bits |= Self::KING_SIDE[Color::White].0,
+            'Q' => bits |= Self::QUEEN_SIDE[Color::White].0,
+            'k' => bits |= Self::KING_SIDE[Color::Black].0,
+            'q' => bits |= Self::QUEEN_SIDE[Color::Black].0,
             _ => (),
         });
         Self(bits)
@@ -51,7 +53,7 @@ impl CastlingRights {
     }
 
     pub(crate) fn update(self, from: Position, to: Position) -> Self {
-        Self(self.0 & Self::MASKS[from.0 as usize] & Self::MASKS[to.0 as usize])
+        Self(self.0 & Self::MASKS[from] & Self::MASKS[to])
     }
 }
 
@@ -227,7 +229,7 @@ impl Board {
                     return;
                 }
 
-                let p = Position((i * 8) as u8 + file);
+                let pos = Position((i * 8) as u8 + file);
                 let (piece, color) = match c {
                     'P' => (Piece::WhitePawn, Color::White),
                     'R' => (Piece::WhiteRook, Color::White),
@@ -243,10 +245,10 @@ impl Board {
                     'k' => (Piece::BlackKing, Color::Black),
                     _ => return,
                 };
-                board.pieces[piece as usize].set_mut(p);
-                board.colors[color as usize].set_mut(p);
-                board.occupancy.set_mut(p);
-                board.mailbox[p.0 as usize] = Some(piece);
+                board.pieces[piece].set_mut(pos);
+                board.colors[color].set_mut(pos);
+                board.occupancy.set_mut(pos);
+                board.mailbox[pos] = Some(piece);
                 file += 1;
             })
         });
@@ -262,27 +264,27 @@ impl Board {
         let mut mask = Bitmask::EMPTY;
         let occupancy_with_ignore = self.occupancy & !ignore;
 
-        mask = self.pieces[Piece::pawn(color) as usize]
-            .map(|p| Bitmask::PAWN_ATTACK_MASKS[color as usize][p.0 as usize])
+        mask = self.pieces[Piece::pawn(color)]
+            .map(|p| Bitmask::PAWN_ATTACK_MASKS[color][p])
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::knight(color) as usize]
-            .map(|p| Bitmask::KNIGHT_ATTACK_MASKS[p.0 as usize])
+        mask = self.pieces[Piece::knight(color)]
+            .map(|p| Bitmask::KNIGHT_ATTACK_MASKS[p])
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::king(color) as usize]
-            .map(|p| Bitmask::KING_ATTACK_MASKS[p.0 as usize])
+        mask = self.pieces[Piece::king(color)]
+            .map(|p| Bitmask::KING_ATTACK_MASKS[p])
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::bishop(color) as usize]
+        mask = self.pieces[Piece::bishop(color)]
             .map(|p| Bitmask::bishop_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::rook(color) as usize]
+        mask = self.pieces[Piece::rook(color)]
             .map(|p| Bitmask::rook_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
-        mask = self.pieces[Piece::queen(color) as usize]
+        mask = self.pieces[Piece::queen(color)]
             .map(|p| Bitmask::queen_attack_mask(p, occupancy_with_ignore))
             .fold(mask, |acc, attack| acc | attack);
 
@@ -292,12 +294,12 @@ impl Board {
     pub(crate) fn move_gen_masks(&self, color: Color) -> MoveGenMasks {
         let mut masks = MoveGenMasks::new();
         let opponent = color.flip();
-        let king_position = self.pieces[Piece::king(color) as usize].lsb();
+        let king_position = self.pieces[Piece::king(color)].lsb();
 
-        let opponent_straight_slider = self.pieces[Piece::rook(opponent) as usize]
-            | self.pieces[Piece::queen(opponent) as usize];
-        let opponent_diagonal_slider = self.pieces[Piece::bishop(opponent) as usize]
-            | self.pieces[Piece::queen(opponent) as usize];
+        let opponent_straight_slider =
+            self.pieces[Piece::rook(opponent)] | self.pieces[Piece::queen(opponent)];
+        let opponent_diagonal_slider =
+            self.pieces[Piece::bishop(opponent)] | self.pieces[Piece::queen(opponent)];
 
         for (direction, sliders, is_positive_ray) in [
             (Direction::North, opponent_straight_slider, true),
@@ -309,7 +311,7 @@ impl Board {
             (Direction::SouthEast, opponent_diagonal_slider, false),
             (Direction::SouthWest, opponent_diagonal_slider, false),
         ] {
-            let attack_mask = Bitmask::RAYS[direction as usize][king_position.0 as usize] & sliders;
+            let attack_mask = Bitmask::RAYS[direction][king_position] & sliders;
             if attack_mask == Bitmask::EMPTY {
                 continue;
             }
@@ -320,8 +322,7 @@ impl Board {
                 attack_mask.msb()
             };
 
-            let between_mask =
-                Bitmask::BETWEEN_MASKS[attacker_position.0 as usize][king_position.0 as usize];
+            let between_mask = Bitmask::BETWEEN_MASKS[attacker_position][king_position];
             let blocker_mask = between_mask & self.occupancy;
 
             if blocker_mask == Bitmask::EMPTY {
@@ -332,15 +333,14 @@ impl Board {
                 continue;
             }
 
-            let friendly_blocker_mask = between_mask & self.colors[color as usize];
+            let friendly_blocker_mask = between_mask & self.colors[color];
             if blocker_mask.has_only_one_set() && blocker_mask == friendly_blocker_mask {
-                masks.pin_rays[blocker_mask.lsb().0 as usize] =
-                    between_mask | attacker_position.mask();
+                masks.pin_rays[blocker_mask.lsb()] = between_mask | attacker_position.mask();
             }
         }
 
-        for attacker_position in Bitmask::KNIGHT_ATTACK_MASKS[king_position.0 as usize]
-            & self.pieces[Piece::knight(opponent) as usize]
+        for attacker_position in
+            Bitmask::KNIGHT_ATTACK_MASKS[king_position] & self.pieces[Piece::knight(opponent)]
         {
             masks.check_mask &= attacker_position.mask();
             if masks.is_double_check() {
@@ -348,9 +348,8 @@ impl Board {
             }
         }
 
-        for attacker_position in Bitmask::PAWN_ATTACK_MASKS[color as usize]
-            [king_position.0 as usize]
-            & self.pieces[Piece::pawn(opponent) as usize]
+        for attacker_position in
+            Bitmask::PAWN_ATTACK_MASKS[color][king_position] & self.pieces[Piece::pawn(opponent)]
         {
             masks.check_mask &= attacker_position.mask();
             if masks.is_double_check() {
@@ -362,24 +361,24 @@ impl Board {
     }
 
     pub(crate) fn set_piece(&mut self, position: Position, piece: Piece) {
-        if let Some(idx) = self.mailbox[position.0 as usize] {
-            self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
-            self.colors[idx.color() as usize] = self.colors[idx.color() as usize].unset(position);
+        if let Some(idx) = self.mailbox[position] {
+            self.pieces[idx] = self.pieces[idx].unset(position);
+            self.colors[idx.color()] = self.colors[idx.color()].unset(position);
         }
-        self.pieces[piece as usize] = self.pieces[piece as usize].set(position);
-        self.mailbox[position.0 as usize] = Some(piece);
+        self.pieces[piece] = self.pieces[piece].set(position);
+        self.mailbox[position] = Some(piece);
         self.occupancy = self.occupancy.set(position);
-        self.colors[piece.color() as usize] = self.colors[piece.color() as usize].set(position);
+        self.colors[piece.color()] = self.colors[piece.color()].set(position);
     }
 
     pub(crate) fn unset_piece(&mut self, position: Position) {
-        let Some(idx) = self.mailbox[position.0 as usize] else {
+        let Some(idx) = self.mailbox[position] else {
             return;
         };
-        self.pieces[idx as usize] = self.pieces[idx as usize].unset(position);
-        self.mailbox[position.0 as usize] = None;
+        self.pieces[idx] = self.pieces[idx].unset(position);
+        self.mailbox[position] = None;
         self.occupancy = self.occupancy.unset(position);
-        self.colors[idx.color() as usize] = self.colors[idx.color() as usize].unset(position);
+        self.colors[idx.color()] = self.colors[idx.color()].unset(position);
     }
 
     pub(crate) fn move_piece(
@@ -387,23 +386,22 @@ impl Board {
         from: Position,
         to: Position,
     ) -> (Option<Piece>, Option<Piece>) {
-        let Some(from_piece) = self.mailbox[from.0 as usize] else {
+        let Some(from_piece) = self.mailbox[from] else {
             return (None, None);
         };
 
-        let next_from_board = self.pieces[from_piece as usize].unset(from).set(to);
+        let next_from_board = self.pieces[from_piece].unset(from).set(to);
 
-        let captured = self.mailbox[to.0 as usize];
+        let captured = self.mailbox[to];
         if let Some(to_idx) = captured {
-            self.pieces[to_idx as usize] = self.pieces[to_idx as usize].unset(to);
-            self.colors[to_idx.color() as usize] = self.colors[to_idx.color() as usize].unset(to);
+            self.pieces[to_idx] = self.pieces[to_idx].unset(to);
+            self.colors[to_idx.color()] = self.colors[to_idx.color()].unset(to);
         }
 
-        self.pieces[from_piece as usize] = next_from_board;
-        self.mailbox[to.0 as usize] = Some(from_piece);
-        self.mailbox[from.0 as usize] = None;
-        self.colors[from_piece.color() as usize] =
-            self.colors[from_piece.color() as usize].unset(from).set(to);
+        self.pieces[from_piece] = next_from_board;
+        self.mailbox[to] = Some(from_piece);
+        self.mailbox[from] = None;
+        self.colors[from_piece.color()] = self.colors[from_piece.color()].unset(from).set(to);
         self.occupancy = self.occupancy.unset(from).set(to);
         (Some(from_piece), captured)
     }
@@ -415,12 +413,12 @@ impl std::fmt::Display for Board {
             write!(f, "{} ", rank + 1)?;
             for file in 0..8 {
                 let idx = rank * 8 + file;
-                match self.mailbox[idx as usize] {
+                match self.mailbox[idx] {
                     Some(piece) => write!(f, " {}", piece)?,
                     None => write!(f, " .")?,
                 };
             }
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
         writeln!(f, "   a b c d e f g h")
     }
