@@ -1,5 +1,9 @@
-use super::types::*;
-use std::ops::*;
+use std::ops::{
+    BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
+    ShrAssign,
+};
+
+use super::types::{Direction, Position};
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq)]

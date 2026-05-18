@@ -1,9 +1,12 @@
-use super::bitmask::*;
-use super::board::*;
-use super::moves::*;
-use super::prng::*;
-use super::types::*;
 use arrayvec::ArrayVec;
+
+use crate::chess::{
+    bitmask::Bitmask,
+    board::{Board, CastlingRights, MoveGenMasks},
+    moves::{Move, MoveType},
+    prng::{RAND_CASTLING, RAND_COLOR, RAND_EN_PASSANT, RAND_PLACEMENT},
+    types::{Color, Direction, Piece, Position},
+};
 
 #[derive(Clone)]
 struct UndoRecord {

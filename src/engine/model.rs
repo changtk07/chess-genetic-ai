@@ -13,38 +13,57 @@ use burn::{
     Tensor,
 };
 
-use crate::chess::State;
+use crate::chess::{board::CastlingRights, State};
 
 #[derive(Module, Debug)]
 struct ChessEmbedding<B: Backend> {
     e_piece: Embedding<B>,
     e_pos: Embedding<B>,
+    ff: Linear<B>,
 }
 
 impl<B: Backend> ChessEmbedding<B> {
     fn forward(&self, states: &[&State], device: &B::Device) -> Tensor<B, 3> {
-        let piece_data: Vec<i32> = states
-            .iter()
-            .flat_map(|state| {
-                state.board.mailbox.iter().map(|sqr| match sqr {
-                    Some(piece) => *piece as i32 + 1,
-                    None => 0,
-                })
-            })
-            .collect();
         let batch_size = states.len();
-        let piece_input = Tensor::from_data(TensorData::new(piece_data, [batch_size, 64]), device);
 
-        let pos_data: Vec<i32> = (0..64).collect();
-        let pos_input = Tensor::from_data(TensorData::new(pos_data, [1, 64]), device);
+        let mut piece_data = Vec::with_capacity(batch_size * 64);
+        piece_data.extend(states.iter().flat_map(|state| {
+            state
+                .board
+                .mailbox
+                .iter()
+                .map(|sqr| sqr.map_or(0i32, |p| p as i32 + 1))
+        }));
+
+        let mut metadata = Vec::with_capacity(batch_size * 15);
+        metadata.extend(states.iter().flat_map(|state| {
+            let ep_idx = state.en_passant.map_or(0, |ep| ep.file() as usize + 1);
+            [(state.turn as i8 * -2 + 1) as f32]
+                .into_iter()
+                .chain(
+                    [
+                        CastlingRights::WHITE_KING_SIDE,
+                        CastlingRights::WHITE_QUEEN_SIDE,
+                        CastlingRights::BLACK_KING_SIDE,
+                        CastlingRights::BLACK_QUEEN_SIDE,
+                    ]
+                    .map(|r| state.castling_rights.has(r) as i8 as f32),
+                )
+                // One-hot en passant file: index 0 = none, 1..=8 = files a..h
+                .chain((0..9).map(move |i| (i == ep_idx) as i8 as f32))
+                .chain([state.halfmove_clock as f32 / 100.0])
+        }));
+
+        let piece_input = Tensor::from_data(TensorData::new(piece_data, [batch_size, 64]), device);
+        let pos_input = Tensor::from_data(TensorData::new((0..64).collect(), [1, 64]), device);
+        let metadata_input: Tensor<B, 2> =
+            Tensor::from_data(TensorData::new(metadata, [batch_size, 15]), device);
 
         let encoded_piece = self.e_piece.forward(piece_input);
         let encoded_pos = self.e_pos.forward(pos_input);
-        let encoded = encoded_piece + encoded_pos;
+        let cls_token = self.ff.forward(metadata_input).unsqueeze_dim(1);
 
-        // TODO: [CLS] token
-
-        encoded
+        Tensor::cat(vec![cls_token, encoded_piece + encoded_pos], 1)
     }
 }
 
@@ -59,6 +78,7 @@ impl ChessEmbeddingConfig {
         ChessEmbedding {
             e_piece: EmbeddingConfig::new(13, self.d_model).init(device),
             e_pos: EmbeddingConfig::new(64, self.d_model).init(device),
+            ff: LinearConfig::new(15, self.d_model).init(device),
         }
     }
 }
