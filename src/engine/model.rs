@@ -1,4 +1,7 @@
-use crate::chess::{board::CastlingRights, State};
+use crate::{
+    chess::{board::CastlingRights, State},
+    engine::policy::N_MOVE_PLANES,
+};
 use burn::{
     config::Config,
     module::Module,
@@ -133,8 +136,6 @@ struct PolicyHead<B: Backend> {
 }
 
 impl<B: Backend> PolicyHead<B> {
-    pub(crate) const N_MOVE_PLANES: usize = 73;
-
     // [batch_size, 64, d_model]
     fn forward(&self, input: Tensor<B, 3>, legal_mask: Tensor<B, 2>) -> Tensor<B, 2> {
         let x = self.ff.forward(input);
@@ -153,7 +154,7 @@ struct PolicyHeadConfig {
 impl PolicyHeadConfig {
     fn init<B: Backend>(&self, device: &B::Device) -> PolicyHead<B> {
         PolicyHead {
-            ff: LinearConfig::new(self.d_model, PolicyHead::<B>::N_MOVE_PLANES).init(device),
+            ff: LinearConfig::new(self.d_model, N_MOVE_PLANES).init(device),
         }
     }
 }
