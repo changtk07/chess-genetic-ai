@@ -199,8 +199,6 @@ pub(crate) struct TransformerModel<B: Backend> {
 }
 
 impl<B: Backend> TransformerModel<B> {
-    pub(crate) const HEAD_DIMENSION: usize = 64;
-
     pub(crate) fn forward(
         &self,
         states: &[&State],
@@ -231,13 +229,15 @@ pub(crate) struct TransformerModelConfig {
     n_blocks: usize,
     #[config(default = 6)]
     n_heads: usize,
-    #[config(default = 2f64)]
+    #[config(default = 2.0)]
     d_ff_scale: f64,
+    #[config(default = 64)]
+    head_dimension: usize,
 }
 
 impl TransformerModelConfig {
     pub(crate) fn init<B: Backend>(&self, device: &B::Device) -> TransformerModel<B> {
-        let d_model = self.n_heads * TransformerModel::<B>::HEAD_DIMENSION;
+        let d_model = self.n_heads * self.head_dimension;
         let d_ff = (self.d_ff_scale * d_model as f64) as usize;
 
         TransformerModel {
